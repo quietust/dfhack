@@ -1052,9 +1052,20 @@ command_result df_twitchname (color_ostream &out, vector <string> & parameters)
 			return CR_OK;
 		}
 	}
+	else if (parameters[0] == "dump")
+	{
+		chat::lock _lock(chat::mutex);
+		out.print("twitchname - Dumping chat user state\n");
+		for (auto iter = chat::users.begin(); iter != chat::users.end(); iter++)
+		{
+			const auto &user = iter->second;
+			out.print("%10i [mod:%i] [sub:%i] [on:%i] %s (%s)\n", user.id, user.is_mod ? 1 : 0, user.is_sub ? 1 : 0, user.is_online ? 1 : 0, user.dispname.c_str(), user.nickname.c_str());
+		}
+		return CR_OK;
+	}
 	else
 	{
-		out.printerr("twitchname - invalid mode specified\n");
+		out.printerr("twitchname - invalid command specified\n");
 		return CR_WRONG_USAGE;
 	}
 }
@@ -1066,8 +1077,10 @@ DFhackCExport command_result plugin_init ( color_ostream &out, vector <PluginCom
 		return CR_FAILURE;
 
 	commands.push_back(PluginCommand("twitchname", "Configure TwitchName plugin", df_twitchname, false,
-		"Usage: twitchname enable <channel>\n"
-		"   or: twitchname disable\n"
+		"Usage:\n"
+		"\ttwitchname enable <channel> - enables Twitch bot and connects to chat\n"
+		"\ttwitchname disable - disconnects from chat\n"
+		"\ttwitchname dump - dumps all chat state to the console\n"
 	));
 
 	config::channel = "";
@@ -1077,6 +1090,7 @@ DFhackCExport command_result plugin_init ( color_ostream &out, vector <PluginCom
 
 	chat::nicknames.clear();
 	chat::users.clear();
+	chat::name_changes.clear();
 	chat::command = chat::COMMAND_NONE;
 	chat::thread = new tthread::thread(chat::threadProc, NULL);
 
@@ -1098,6 +1112,7 @@ DFhackCExport command_result plugin_shutdown ( color_ostream &out )
 
 	chat::nicknames.clear();
 	chat::users.clear();
+	chat::name_changes.clear();
 	state::twitches.clear();
 	state::units.clear();
 
