@@ -769,8 +769,12 @@ bool sortTwitch (const TwitchInfo *d1, const TwitchInfo *d2)
 	if (d1->is_sub > d2->is_sub) return true;
 	if (d2->is_sub > d1->is_sub) return false;
 
-	if (d1->dispname < d2->dispname) return true;
-	if (d2->dispname < d1->dispname) return false;
+
+	string n1 = UTF2DF(d1->dispname); std::transform(n1.begin(), n1.end(), n1.begin(), ::tolower);
+	string n2 = UTF2DF(d2->dispname); std::transform(n2.begin(), n2.end(), n2.begin(), ::tolower);
+
+	if (n1 < n2) return true;
+	if (n2 < n1) return false;
 
 	return false;
 }
