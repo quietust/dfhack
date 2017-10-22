@@ -18,6 +18,7 @@
 #include <vector>
 #include <string>
 #include <set>
+#include <queue>
 #include <algorithm>
 #include <tuple>
 #include <random>
@@ -38,6 +39,7 @@
 using std::set;
 using std::map;
 using std::vector;
+using std::queue;
 using std::string;
 using std::wstring;
 
@@ -58,6 +60,12 @@ struct TwitchInfo
 	bool is_sub;
 	bool is_mod;
 	bool is_online;
+
+	operator std::string ()
+	{
+		string msg = "#" + std::to_string(id) + ": " + dispname + " (" + nickname + "), " + (is_mod ? 'M' : 'm') + (is_sub ? 'S' : 's') + (is_online ? 'O' : 'o');
+		return msg;
+	}
 };
 
 // Server Config
@@ -66,6 +74,7 @@ namespace config
 	string channel;
 	int track_name_changes;
 	int announce_name_changes;
+	int debug_level;
 }
 
 // Client State
@@ -99,6 +108,7 @@ namespace chat
 	map<string, int> nicknames;
 	map<int, TwitchInfo> users;
 	set<int> name_changes;
+	queue<string> debug_log;
 
 	void writeSock (CActiveSocket &sock, string data)
 	{
@@ -168,6 +178,30 @@ namespace chat
 		}
 	}
 
+	void debug_msg (int level, const string &message, const vector<string> &tokens = vector<string>(), const map<string,string> &tags = map<string,string>())
+	{
+		if (config::debug_level < level)
+			return;
+		string msg = message;
+		if (tokens.size())
+		{
+			msg += " [";
+			for (auto iter = tokens.begin(); iter != tokens.end(); iter++)
+				msg += *iter + " ";
+			msg.pop_back();
+			msg += "]";
+		}
+		if (tags.size())
+		{
+			msg += " {";
+			for (auto iter = tags.begin(); iter != tags.end(); iter++)
+				msg += " '" + iter->first + "'='" + iter->second + "',";
+			msg.pop_back();
+			msg += " }";
+		}
+		debug_log.push(msg);
+	}
+
 	void threadProc (void *param)
 	{
 		CActiveSocket sock(CSimpleSocket::SocketTypeTcp);
@@ -215,6 +249,7 @@ namespace chat
 					{
 						lock _lock(mutex);
 						readSock(sock, tokens, tags);
+						debug_msg(1, "Joining channel", tokens, tags);
 						// NAMES reply
 						if (tokens.size() > 5 && tokens[1] == "353")
 						{
@@ -298,13 +333,17 @@ namespace chat
 					if (tokens[2].substr(1) != config::channel)
 						continue;
 					lock _lock(mutex);
+					debug_msg(3, "User spoke", tokens, tags);
 					string nickname;
 					if (tokens[1] == "USERNOTICE")
 						nickname = tags["login"];
 					else	nickname = tokens[0].substr(0, tokens[0].find('!'));
 					string dispname = tags["display-name"];
 					if (!dispname.size())
+					{
+						debug_msg(4, "User had no dispname, using nickname '" + nickname + "' instead");
 						dispname = nickname;
+					}
 					int userid = stoi(tags["user-id"]);
 					bool is_mod = stoi(tags["mod"]) != 0;
 					bool is_sub = stoi(tags["subscriber"]) != 0;
@@ -316,75 +355,114 @@ namespace chat
 
 					if (user.dispname != dispname)
 					{
+						debug_msg(4, "User '"+user.dispname+"' changed name to '" + dispname + "'");
 						user.dispname = dispname;
 						name_changes.insert(userid);
 					}
 					user.is_sub = is_sub;
 					user.is_mod = is_mod;
 					user.is_online = true;
+					debug_msg(4, "Updated user info: " + string(user));
 				}
 				else if (tokens.size() > 2 && tokens[1] == "JOIN")
 				{
 					if (tokens[2].substr(1) != config::channel)
 						continue;
 					lock _lock(mutex);
+					debug_msg(2, "User joined", tokens, tags);
 					const string &nickname = tokens[0].substr(0, tokens[0].find('!'));
 					// assign to 0 if not present
 					if (!nicknames[nickname])
+					{
+						debug_msg(4, "Joining user '"+nickname+"' is not known, ignoring but remembering as online");
 						continue;
+					}
 					int userid = nicknames[nickname];
 					if (users.count(userid))
-						users[userid].is_online = true;
+					{
+						auto &user = users[userid];
+						user.is_online = true;
+						debug_msg(4, "Joining user '"+nickname+"' is " + string(user) + " - now Online");
+					}
+					else	debug_msg(4, "Joining user '"+nickname+"' is #" + std::to_string(userid) + ", not known");
 				}
 				else if (tokens.size() > 2 && tokens[1] == "PART")
 				{
 					if (tokens[2].substr(1) != config::channel)
 						continue;
 					lock _lock(mutex);
+					debug_msg(2, "User left", tokens, tags);
 					const string &nickname = tokens[0].substr(0, tokens[0].find('!'));
 					// do NOT set to 0 if not present
 					if (!nicknames.count(nickname))
+					{
+						debug_msg(4, "Leaving user '"+nickname+"' is not known, ignoring");
 						continue;
+					}
 					// if it's present and zero, then delete it
 					if (!nicknames[nickname])
 					{
+						debug_msg(4, "Leaving user '"+nickname+"' was not known, forgetting");
 						nicknames.erase(nickname);
 						continue;
 					}
 					int userid = nicknames[nickname];
 					if (users.count(userid))
-						users[userid].is_online = false;
+					{
+						auto &user = users[userid];
+						debug_msg(4, "Leaving user '"+nickname+"' is " + string(user) + " - now Offline");
+						user.is_online = false;
+					}
+					else	debug_msg(4, "Leaving user '"+nickname+"' is #" + std::to_string(userid) + ", not known");
 				}
 				else if (tokens.size() > 4 && tokens[1] == "MODE")
 				{
 					if (tokens[2].substr(1) != config::channel)
 						continue;
 					lock _lock(mutex);
+					debug_msg(2, "User mode changed", tokens, tags);
 					const string &nickname = tokens[4];
 					const string &mode = tokens[3];
 					if (mode == "+o")
 					{
 						// set to 0 if not present
 						if (!nicknames[nickname])
+						{
+							debug_msg(4, "Mode changed user '"+nickname+"' is not known, ignoring but remembering as online");
 							continue;
+						}
 						int userid = nicknames[nickname];
 						if (!users.count(userid))
+						{
+							debug_msg(4, "Mode changed user '"+nickname+"' is #" + std::to_string(userid) + ", not known");
 							continue;
+						}
 						auto &user = users[userid];
 						user.is_mod = true;
 						user.is_online = true;
+						debug_msg(4, "Mode changed user '"+nickname+"' is " + string(user) + " - now Moderator and Online");
 					}
 					if (mode == "-o")
 					{
 						// do NOT set to 0 if not present
 						if (!nicknames.count(nickname) || !nicknames[nickname])
+						{
+							debug_msg(4, "Mode changed user '"+nickname+"' is not known, ignoring");
 							continue;
+						}
 						int userid = nicknames[nickname];
 						if (!users.count(userid))
+						{
+							debug_msg(4, "Mode changed user '"+nickname+"' is #" + std::to_string(userid) + ", not known");
 							continue;
+						}
 						auto &user = users[userid];
 						if (user.is_online)
+						{
+							debug_msg(4, "Mode changed user '"+nickname+"' is " + string(user) + " - now Not Moderator");
 							user.is_mod = false;
+						}
+						else	debug_msg(4, "Mode changed user '"+nickname+"' is " + string(user) + " - not online, so ignoring");
 					}
 				}
 			}
@@ -626,7 +704,10 @@ bool loadState(string &channel)
 
 		// do we already have live chat data for this user? if so, ignore what was in the savegame
 		if (chat::users.count(twitch_id))
+		{
+			chat::debug_msg(4, "Ignored savegame data for user #" + std::to_string(twitch_id) + ", already loaded from server");
 			continue;
+		}
 
 		TwitchInfo &info = chat::users[twitch_id];
 		info.id = twitch_id;
@@ -638,10 +719,14 @@ bool loadState(string &channel)
 
 		// populate nickname lookup info - if it's not present, then add it
 		if (!chat::nicknames.count(nickname))
+		{
+			chat::debug_msg(4, "Nickname '" + nickname + "' registered as #" + std::to_string(info.id));
 			chat::nicknames[nickname] = info.id;
+		}
 		// if it's present and zero, then set it nonzero and mark the user as Online
 		else if (!chat::nicknames[nickname])
 		{
+			chat::debug_msg(4, "Nickname '" + nickname + "' registered as #" + std::to_string(info.id) + " and marked as online");
 			chat::nicknames[nickname] = info.id;
 			info.is_online = true;
 		}
@@ -968,6 +1053,12 @@ DFhackCExport command_result plugin_onupdate ( color_ostream &out )
 			}
 			chat::name_changes.clear();
 		}
+		while (!chat::debug_log.empty())
+		{
+			string msg = chat::debug_log.front();
+			out.print("twitchname - DEBUG - %s\n", msg.c_str());
+			chat::debug_log.pop();
+		}
 	}
 	return CR_OK;
 }
@@ -1132,6 +1223,22 @@ command_result df_twitchname (color_ostream &out, vector <string> & parameters)
 				return CR_WRONG_USAGE;
 			}
 		}
+		else if (parameters[1] == "debug_level")
+		{
+			int val;
+		        ss >> val;
+			if ((val >= 0) && (val <= 4))
+			{
+				out.print("twitchname - '%s' changed to %i\n", parameters[1].c_str(), val);
+				config::debug_level = val;
+				return CR_OK;
+			}
+			else
+			{
+				out.printerr("twitchname - invalid value for '%s'\n", parameters[1].c_str());
+				return CR_WRONG_USAGE;
+			}
+		}
 		else
 		{
 			out.printerr("twitchname config - unknown option '%s'\n", parameters[1].c_str());
@@ -1167,17 +1274,25 @@ DFhackCExport command_result plugin_init ( color_ostream &out, vector <PluginCom
 		"\tannounce_name_changes <0/1> - control whether name changes will show up as announcements\n"
 		"\t\t0 - don't announce name changes\n"
 		"\t\t1 - announce name changes\n"
+		"\tdebug_level <0/1/2> - set debug log level\n"
+		"\t\t0 - no events\n"
+		"\t\t1 - login events\n"
+		"\t\t2 - people joining and leaving chat\n"
+		"\t\t3 - people talking in chat\n"
+		"\t\t4 - detailed event data\n"
 	));
 
 	config::channel = "";
 	config::track_name_changes = 0;
 	config::announce_name_changes = 0;
+	config::debug_level = 0;
 
 	state::twitches.clear();
 	state::units.clear();
 
 	chat::nicknames.clear();
 	chat::users.clear();
+	queue<string>().swap(chat::debug_log);
 	chat::name_changes.clear();
 	chat::command = chat::COMMAND_NONE;
 	chat::thread = new tthread::thread(chat::threadProc, NULL);
@@ -1201,6 +1316,7 @@ DFhackCExport command_result plugin_shutdown ( color_ostream &out )
 	chat::nicknames.clear();
 	chat::users.clear();
 	chat::name_changes.clear();
+	queue<string>().swap(chat::debug_log);
 	state::twitches.clear();
 	state::units.clear();
 
