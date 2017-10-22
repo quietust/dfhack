@@ -752,7 +752,7 @@ bool loadState(string &channel)
 		if (!Units::isDead(unit) || !state::twitches.count(twitch_id))
 			state::twitches[twitch_id] = unit_id;
 
-		if (config::track_name_changes >= 2)
+		if (config::track_name_changes >= 1)
 			checkFixName(unit, twitch_id);
 	}
 	return true;
@@ -1048,7 +1048,7 @@ DFhackCExport command_result plugin_onupdate ( color_ostream &out )
 				if (!chat::name_changes.count(twitch_id))
 					continue;
 				df::unit *unit = df::unit::find(unit_id);
-				if (unit && (config::track_name_changes >= 1))
+				if (unit && (config::track_name_changes >= 2))
 					checkFixName(unit, twitch_id);
 			}
 			chat::name_changes.clear();
