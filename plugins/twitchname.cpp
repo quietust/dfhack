@@ -64,6 +64,8 @@ struct TwitchInfo
 namespace config
 {
 	string channel;
+	int track_name_changes;
+	int announce_name_changes;
 }
 
 // Client State
@@ -536,7 +538,8 @@ bool checkFixName (df::unit *unit, int twitch_id)
 			msg += "her";
 		else	msg += "its";
 		msg += " nickname from '" + old_name + "' to '" + new_name + "'";
-		Gui::showAnnouncement(msg, 6, true);
+		if (config::announce_name_changes)
+			Gui::showAnnouncement(msg, 6, true);
 		Units::setNickname(unit, new_name.c_str());
 		return true;
 	}
@@ -663,7 +666,8 @@ bool loadState(string &channel)
 		if (!Units::isDead(unit) || !state::twitches.count(twitch_id))
 			state::twitches[twitch_id] = unit_id;
 
-		checkFixName(unit, twitch_id);
+		if (config::track_name_changes >= 2)
+			checkFixName(unit, twitch_id);
 	}
 	return true;
 }
@@ -958,7 +962,7 @@ DFhackCExport command_result plugin_onupdate ( color_ostream &out )
 				if (!chat::name_changes.count(twitch_id))
 					continue;
 				df::unit *unit = df::unit::find(unit_id);
-				if (unit)
+				if (unit && (config::track_name_changes >= 1))
 					checkFixName(unit, twitch_id);
 			}
 			chat::name_changes.clear();
@@ -1063,6 +1067,52 @@ command_result df_twitchname (color_ostream &out, vector <string> & parameters)
 		}
 		return CR_OK;
 	}
+	else if (parameters[0] == "config")
+	{
+		if (parameters.size() < 3)
+		{
+			out.printerr("twitchname config - not enough parameters specified\n");
+			return CR_WRONG_USAGE;
+		}
+	        stringstream ss(parameters[2]);
+		if (parameters[1] == "track_name_changes")
+		{
+			int val;
+		        ss >> val;
+			if ((val >= 0) && (val <= 2))
+			{
+				out.print("twitchname - '%s' changed to %i\n", parameters[1].c_str(), val);
+				config::track_name_changes = val;
+				return CR_OK;
+			}
+			else
+			{
+				out.printerr("twitchname - invalid value for '%s'\n", parameters[1].c_str());
+				return CR_WRONG_USAGE;
+			}
+		}
+		else if (parameters[1] == "announce_name_changes")
+		{
+			int val;
+		        ss >> val;
+			if ((val >= 0) && (val <= 1))
+			{
+				out.print("twitchname - '%s' changed to %i\n", parameters[1].c_str(), val);
+				config::announce_name_changes = val;
+				return CR_OK;
+			}
+			else
+			{
+				out.printerr("twitchname - invalid value for '%s'\n", parameters[1].c_str());
+				return CR_WRONG_USAGE;
+			}
+		}
+		else
+		{
+			out.printerr("twitchname config - unknown option '%s'\n", parameters[1].c_str());
+			return CR_WRONG_USAGE;
+		}
+	}
 	else
 	{
 		out.printerr("twitchname - invalid command specified\n");
@@ -1081,9 +1131,20 @@ DFhackCExport command_result plugin_init ( color_ostream &out, vector <PluginCom
 		"\ttwitchname enable <channel> - enables Twitch bot and connects to chat\n"
 		"\ttwitchname disable - disconnects from chat\n"
 		"\ttwitchname dump - dumps all chat state to the console\n"
+		"\ttwitchname config <name> <value> - set configuration options\n"
+		"Configuration options:\n"
+		"\ttrack_name_changes <0/1/2> - control whether Dwarves get automatically renamed in response to Twitch nickname changes.\n"
+		"\t\t0 - do not rename at all\n"
+		"\t\t1 - only rename on fortress load\n"
+		"\t\t2 - rename in real time\n"
+		"\tannounce_name_changes <0/1> - control whether name changes will show up as announcements\n"
+		"\t\t0 - don't announce name changes\n"
+		"\t\t1 - announce name changes\n"
 	));
 
 	config::channel = "";
+	config::track_name_changes = 0;
+	config::announce_name_changes = 0;
 
 	state::twitches.clear();
 	state::units.clear();
