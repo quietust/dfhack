@@ -517,7 +517,7 @@ bool assignUnit (TwitchInfo *user, df::unit *unit)
 }
 
 // NOTE: must be called from main thread while holding the Chat Mutex lock
-bool checkFixName (df::unit *unit, int twitch_id)
+bool checkFixName (df::unit *unit, int twitch_id, string &msg = string(), bool doFix = true)
 {
 	if (!chat::users.count(twitch_id))
 		return false;	// this should be impossible
@@ -529,7 +529,7 @@ bool checkFixName (df::unit *unit, int twitch_id)
 	string new_name = UTF2DF(user.dispname) + getOrdinalStr(ordinal);
 	if (new_name != old_name)
 	{
-		string msg = unit->name.first_name + " " + Translation::TranslateName(&unit->name, false, true);
+		msg = unit->name.first_name + " " + Translation::TranslateName(&unit->name, false, true);
 		msg[0] = toupper(msg[0]);
 		msg += " has changed ";
 		if (unit->sex == 1)
@@ -540,7 +540,8 @@ bool checkFixName (df::unit *unit, int twitch_id)
 		msg += " nickname from '" + old_name + "' to '" + new_name + "'";
 		if (config::announce_name_changes)
 			Gui::showAnnouncement(msg, 6, true);
-		Units::setNickname(unit, new_name.c_str());
+		if (doFix)
+			Units::setNickname(unit, new_name.c_str());
 		return true;
 	}
 	return false;
@@ -1067,6 +1068,30 @@ command_result df_twitchname (color_ostream &out, vector <string> & parameters)
 		}
 		return CR_OK;
 	}
+	else if (parameters[0] == "resync")
+	{
+		bool doFix = true;
+		if ((parameters.size() > 1) && (parameters[1] == "check"))
+			doFix = false;
+
+		chat::lock _lock(chat::mutex);
+		for (auto iter = state::units.begin(); iter != state::units.end(); iter++)
+		{
+			int unit_id = iter->first;
+			int twitch_id = iter->second;
+			df::unit *unit = df::unit::find(unit_id);
+
+			if (!chat::users.count(twitch_id))
+				continue;	// Twitch user not found - skip
+			if (!unit)
+				continue;	// Unit not found - skip
+
+			string msg;
+			checkFixName(unit, twitch_id, msg, doFix);
+			out.print("twitchname - %s%s\n", msg.c_str(), doFix ? ", applied." : "");
+		}
+		return CR_OK;
+	}
 	else if (parameters[0] == "config")
 	{
 		if (parameters.size() < 3)
@@ -1131,6 +1156,8 @@ DFhackCExport command_result plugin_init ( color_ostream &out, vector <PluginCom
 		"\ttwitchname enable <channel> - enables Twitch bot and connects to chat\n"
 		"\ttwitchname disable - disconnects from chat\n"
 		"\ttwitchname dump - dumps all chat state to the console\n"
+		"\ttwitchname resync [check] - immediately update Dwarf names based on Twitch nicknames\n"
+		"\t\tcheck - don't rename, just display what names were changed\n"
 		"\ttwitchname config <name> <value> - set configuration options\n"
 		"Configuration options:\n"
 		"\ttrack_name_changes <0/1/2> - control whether Dwarves get automatically renamed in response to Twitch nickname changes.\n"
