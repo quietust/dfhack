@@ -1,4 +1,4 @@
-// Dwarf Name Manager - retrieves names from external web service linked to a Twitch chat bot
+// Dwarf Name Manager - retrieves names from Twitch.TV chat
 
 #include "Core.h"
 #include "Console.h"
@@ -13,7 +13,7 @@
 
 #include "tinythread.h"
 #include "ActiveSocket.h"
-#include "jsoncpp.h"
+#include "json/json.h"
 
 #include <vector>
 #include <string>
@@ -967,7 +967,7 @@ struct customize_hook : df::viewscreen_customize_unitst
 		{
 			if (events->count(interface_key::CUSTOM_T))
 			{
-				Screen::show(new viewscreen_twitchnamest(unit), plugin_self);
+				Screen::show(dts::make_unique<viewscreen_twitchnamest>(unit), plugin_self);
 				return;
 			}
 		}
