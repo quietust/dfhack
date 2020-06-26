@@ -595,8 +595,9 @@ bool assignUnit (TwitchInfo *user, df::unit *unit)
 }
 
 // NOTE: must be called from main thread while holding the Chat Mutex lock
-bool checkFixName (df::unit *unit, int twitch_id, string &msg = string(), bool doFix = true)
+bool checkFixName (df::unit *unit, int twitch_id, string *outmsg = NULL, bool doFix = true)
 {
+	string msg;
 	if (!chat::users.count(twitch_id))
 		return false;	// this should be impossible
 	const TwitchInfo &user = chat::users[twitch_id];
@@ -616,6 +617,8 @@ bool checkFixName (df::unit *unit, int twitch_id, string &msg = string(), bool d
 			msg += "her";
 		else	msg += "its";
 		msg += " nickname from '" + old_name + "' to '" + new_name + "'";
+		if (outmsg)
+			*outmsg = msg;
 		if (config::announce_name_changes)
 			Gui::showAnnouncement(msg, 6, true);
 		if (doFix)
@@ -1182,7 +1185,7 @@ command_result df_twitchname (color_ostream &out, vector <string> & parameters)
 				continue;	// Unit not found - skip
 
 			string msg;
-			checkFixName(unit, twitch_id, msg, doFix);
+			checkFixName(unit, twitch_id, &msg, doFix);
 			out.print("twitchname - %s%s\n", msg.c_str(), doFix ? ", applied." : "");
 		}
 		return CR_OK;
