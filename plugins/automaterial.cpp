@@ -18,8 +18,8 @@
 #include "df/build_req_choice_specst.h"
 #include "df/construction_type.h"
 #include "df/item.h"
-#include "df/ui.h"
-#include "df/ui_build_selector.h"
+#include "df/plotinfost.h"
+#include "df/buildreq.h"
 #include "df/viewscreen_dwarfmodest.h"
 #include "df/items_other_id.h"
 #include "df/job.h"
@@ -47,8 +47,8 @@ using namespace df::enums;
 
 DFHACK_PLUGIN("automaterial");
 REQUIRE_GLOBAL(gps);
-REQUIRE_GLOBAL(ui);
-REQUIRE_GLOBAL(ui_build_selector);
+REQUIRE_GLOBAL(plotinfo);
+REQUIRE_GLOBAL(buildreq);
 
 struct MaterialDescriptor
 {
@@ -143,60 +143,60 @@ static bool allow_future_placement = false;
 static inline bool in_material_choice_stage()
 {
     return Gui::build_selector_hotkey(Core::getTopViewscreen()) &&
-        ui_build_selector->building_type == df::building_type::Construction &&
-        ui->main.mode == ui_sidebar_mode::Build &&
-        ui_build_selector->stage == 2;
+        buildreq->building_type == df::building_type::Construction &&
+        plotinfo->main.mode == ui_sidebar_mode::Build &&
+        buildreq->stage == 2;
 }
 
 static inline bool in_placement_stage()
 {
     return Gui::dwarfmode_hotkey(Core::getTopViewscreen()) &&
-        ui->main.mode == ui_sidebar_mode::Build &&
-        ui_build_selector &&
-        ui_build_selector->building_type == df::building_type::Construction &&
-        ui_build_selector->stage == 1;
+        plotinfo->main.mode == ui_sidebar_mode::Build &&
+        buildreq &&
+        buildreq->building_type == df::building_type::Construction &&
+        buildreq->stage == 1;
 }
 
 static inline bool in_type_choice_stage()
 {
     return Gui::dwarfmode_hotkey(Core::getTopViewscreen()) &&
-        ui->main.mode == ui_sidebar_mode::Build &&
-        ui_build_selector &&
-        ui_build_selector->building_type < 0;
+        plotinfo->main.mode == ui_sidebar_mode::Build &&
+        buildreq &&
+        buildreq->building_type < 0;
 }
 
 static inline vector<MaterialDescriptor> &get_curr_constr_prefs()
 {
-    if (preferred_materials.find(ui_build_selector->building_subtype) == preferred_materials.end())
-        preferred_materials[ui_build_selector->building_subtype] = vector<MaterialDescriptor>();
+    if (preferred_materials.find(buildreq->building_subtype) == preferred_materials.end())
+        preferred_materials[buildreq->building_subtype] = vector<MaterialDescriptor>();
 
-    return preferred_materials[ui_build_selector->building_subtype];
+    return preferred_materials[buildreq->building_subtype];
 }
 
 static inline MaterialDescriptor &get_last_used_material()
 {
-    if (last_used_material.find(ui_build_selector->building_subtype) == last_used_material.end())
-        last_used_material[ui_build_selector->building_subtype] = MaterialDescriptor();
+    if (last_used_material.find(buildreq->building_subtype) == last_used_material.end())
+        last_used_material[buildreq->building_subtype] = MaterialDescriptor();
 
-    return last_used_material[ui_build_selector->building_subtype];
+    return last_used_material[buildreq->building_subtype];
 }
 
 static void set_last_used_material(const MaterialDescriptor &matetial)
 {
-    last_used_material[ui_build_selector->building_subtype] = matetial;
+    last_used_material[buildreq->building_subtype] = matetial;
 }
 
 static MaterialDescriptor &get_last_moved_material()
 {
-    if (last_moved_material.find(ui_build_selector->building_subtype) == last_moved_material.end())
-        last_moved_material[ui_build_selector->building_subtype] = MaterialDescriptor();
+    if (last_moved_material.find(buildreq->building_subtype) == last_moved_material.end())
+        last_moved_material[buildreq->building_subtype] = MaterialDescriptor();
 
-    return last_moved_material[ui_build_selector->building_subtype];
+    return last_moved_material[buildreq->building_subtype];
 }
 
 static void set_last_moved_material(const MaterialDescriptor &matetial)
 {
-    last_moved_material[ui_build_selector->building_subtype] = matetial;
+    last_moved_material[buildreq->building_subtype] = matetial;
 }
 
 static MaterialDescriptor get_material_in_list(size_t i)
@@ -204,7 +204,7 @@ static MaterialDescriptor get_material_in_list(size_t i)
     MaterialDescriptor result;
     result.valid = false;
 
-    if (VIRTUAL_CAST_VAR(gen, df::build_req_choice_genst, ui_build_selector->choices[i]))
+    if (VIRTUAL_CAST_VAR(gen, df::build_req_choice_genst, buildreq->choices[i]))
     {
         result.item_type = gen->item_type;
         result.item_subtype = gen->item_subtype;
@@ -212,7 +212,7 @@ static MaterialDescriptor get_material_in_list(size_t i)
         result.index = gen->mat_index;
         result.valid = true;
     }
-    else if (VIRTUAL_CAST_VAR(spec, df::build_req_choice_specst, ui_build_selector->choices[i]))
+    else if (VIRTUAL_CAST_VAR(spec, df::build_req_choice_specst, buildreq->choices[i]))
     {
         result.item_type = spec->candidate->getType();
         result.item_subtype = spec->candidate->getSubtype();
@@ -237,7 +237,7 @@ static bool is_material_in_autoselect(size_t &i, MaterialDescriptor &material)
 
 static bool is_material_in_list(size_t &i, MaterialDescriptor &material)
 {
-    const size_t size = ui_build_selector->choices.size(); //Just because material list could be very big
+    const size_t size = buildreq->choices.size(); //Just because material list could be very big
     for (i = 0; i < size; i++)
     {
         if (get_material_in_list(i).matches(material))
@@ -252,11 +252,11 @@ static bool move_material_to_top(MaterialDescriptor &material)
     size_t i;
     if (is_material_in_list(i, material))
     {
-        auto sel_item = ui_build_selector->choices[i];
-        ui_build_selector->choices.erase(ui_build_selector->choices.begin() + i);
-        ui_build_selector->choices.insert(ui_build_selector->choices.begin(), sel_item);
+        auto sel_item = buildreq->choices[i];
+        buildreq->choices.erase(buildreq->choices.begin() + i);
+        buildreq->choices.insert(buildreq->choices.begin(), sel_item);
 
-        ui_build_selector->sel_index = 0;
+        buildreq->sel_index = 0;
         set_last_moved_material(material);
         return true;
     }
@@ -386,8 +386,8 @@ static bool is_valid_building_site(building_site &site, bool orthogonal_check, b
         df::tiletype_shape shape_s;
         df::tiletype_shape_basic shape_basic_s;
 
-        if (ui_build_selector->building_subtype == construction_type::DownStair ||
-            ui_build_selector->building_subtype == construction_type::UpDownStair)
+        if (buildreq->building_subtype == construction_type::DownStair ||
+            buildreq->building_subtype == construction_type::UpDownStair)
         {
             df::coord below(site.pos.x, site.pos.y, site.pos.z - 1);
             auto ttype_s = read_tile_shapes(below, shape_s, shape_basic_s);
@@ -398,8 +398,8 @@ static bool is_valid_building_site(building_site &site, bool orthogonal_check, b
             }
         }
 
-        if (ui_build_selector->building_subtype == construction_type::UpStair ||
-            ui_build_selector->building_subtype == construction_type::UpDownStair)
+        if (buildreq->building_subtype == construction_type::UpStair ||
+            buildreq->building_subtype == construction_type::UpDownStair)
         {
             df::coord above(site.pos.x, site.pos.y, site.pos.z + 1);
             auto ttype_s = read_tile_shapes(above, shape_s, shape_basic_s);
@@ -620,7 +620,7 @@ struct jobutils_hook : public df::viewscreen_dwarfmodest
 
     bool select_material_at_index(size_t i)
     {
-        ui_build_selector->sel_index = i;
+        buildreq->sel_index = i;
         std::set< df::interface_key > keys;
         keys.insert(df::interface_key::SELECT_ALL);
         this->feed(&keys);
@@ -632,7 +632,7 @@ struct jobutils_hook : public df::viewscreen_dwarfmodest
         if (!auto_choose_materials || get_curr_constr_prefs().size() == 0)
             return false;
 
-        size_t size = ui_build_selector->choices.size();
+        size_t size = buildreq->choices.size();
         for (size_t i = 0; i < size; i++)
         {
             MaterialDescriptor material = get_material_in_list(i);
@@ -651,8 +651,8 @@ struct jobutils_hook : public df::viewscreen_dwarfmodest
         if (!box_select_enabled)
             return;
 
-        if (ui->main.mode != df::ui_sidebar_mode::Build ||
-            ui_build_selector->building_type != df::building_type::Construction)
+        if (plotinfo->main.mode != df::ui_sidebar_mode::Build ||
+            buildreq->building_type != df::building_type::Construction)
             return;
 
         df::coord vport = Gui::getViewportPos();
@@ -714,7 +714,7 @@ struct jobutils_hook : public df::viewscreen_dwarfmodest
 
     void handle_input(set<df::interface_key> *input)
     {
-        if (ui_build_selector->building_subtype >= 7)
+        if (buildreq->building_subtype >= 7)
             return;
 
         if (in_material_choice_stage())
@@ -724,7 +724,7 @@ struct jobutils_hook : public df::viewscreen_dwarfmodest
                 box_select_mode = SELECT_FIRST;
             }
 
-            MaterialDescriptor material = get_material_in_list(ui_build_selector->sel_index);
+            MaterialDescriptor material = get_material_in_list(buildreq->sel_index);
             if (material.valid)
             {
                 if (input->count(interface_key::SELECT) || input->count(interface_key::SELECT_ALL))
@@ -736,12 +736,12 @@ struct jobutils_hook : public df::viewscreen_dwarfmodest
 
                     if (box_select_enabled)
                     {
-                        auto curr_index = ui_build_selector->sel_index;
+                        auto curr_index = buildreq->sel_index;
                         vector<MaterialDescriptor> gen_material;
                         gen_material.push_back(get_material_in_list(curr_index));
                         box_select_materials.clear();
                         // Populate material list with selected material
-                        populate_box_materials(gen_material, ((input->count(interface_key::SELECT_ALL) && ui_build_selector->is_grouped) ? -1 : 1));
+                        populate_box_materials(gen_material, ((input->count(interface_key::SELECT_ALL) && buildreq->general_choices) ? -1 : 1));
 
                         input->clear(); // Let the apply_box_selection routine allocate the construction
                         input->insert(interface_key::LEAVESCREEN);
@@ -862,14 +862,14 @@ struct jobutils_hook : public df::viewscreen_dwarfmodest
         if (gen_materials.size() == 0)
             return result;
 
-        if (ui_build_selector->is_grouped)
+        if (buildreq->general_choices)
             send_key(interface_key::BUILDING_EXPAND_CONTRACT);
 
-        size_t size = ui_build_selector->choices.size();
+        size_t size = buildreq->choices.size();
         vector<MaterialDescriptor>::iterator gen_material;
         for (size_t i = 0; i < size; i++)
         {
-            if (VIRTUAL_CAST_VAR(spec, df::build_req_choice_specst, ui_build_selector->choices[i]))
+            if (VIRTUAL_CAST_VAR(spec, df::build_req_choice_specst, buildreq->choices[i]))
             {
                 for (gen_material = gen_materials.begin(); gen_material != gen_materials.end(); gen_material++)
                 {
@@ -961,7 +961,7 @@ struct jobutils_hook : public df::viewscreen_dwarfmodest
             valid_building_sites.pop_front();
             if (box_select_materials.size() > 0)
             {
-                df::construction_type type = (df::construction_type) ui_build_selector->building_subtype;
+                df::construction_type type = (df::construction_type) buildreq->building_subtype;
                 df::item *item = NULL;
                 while (box_select_materials.size() > 0)
                 {
@@ -1007,7 +1007,7 @@ struct jobutils_hook : public df::viewscreen_dwarfmodest
                 {
                     // See if any auto select materials are available
                     auto_select_applied = true;
-                    if (auto_choose_materials && populate_box_materials(preferred_materials[ui_build_selector->building_subtype]))
+                    if (auto_choose_materials && populate_box_materials(preferred_materials[buildreq->building_subtype]))
                     {
                         continue;
                     }
@@ -1045,7 +1045,7 @@ struct jobutils_hook : public df::viewscreen_dwarfmodest
         if (box_select_mode != AUTOSELECT_MATERIALS)
             handle_input(input);
 
-        int16_t last_used_constr_subtype = (in_material_choice_stage()) ?  ui_build_selector->building_subtype : -1;
+        int16_t last_used_constr_subtype = (in_material_choice_stage()) ?  buildreq->building_subtype : -1;
         INTERPOSE_NEXT(feed)(input);
 
         if (revert_to_last_used_type &&
@@ -1073,7 +1073,7 @@ struct jobutils_hook : public df::viewscreen_dwarfmodest
 
         if (in_material_choice_stage())
         {
-            if (!last_used_moved && ui_build_selector->is_grouped)
+            if (!last_used_moved && buildreq->general_choices)
             {
                 last_used_moved = true;
                 if (!box_select_enabled && choose_materials())
@@ -1085,7 +1085,7 @@ struct jobutils_hook : public df::viewscreen_dwarfmodest
                     move_material_to_top(get_last_used_material());
                 }
             }
-            else if (!ui_build_selector->is_grouped)
+            else if (!buildreq->general_choices)
             {
                 last_used_moved = false;
             }
@@ -1111,7 +1111,7 @@ struct jobutils_hook : public df::viewscreen_dwarfmodest
         int y = 25;
         if (in_material_choice_stage())
         {
-            MaterialDescriptor material = get_material_in_list(ui_build_selector->sel_index);
+            MaterialDescriptor material = get_material_in_list(buildreq->sel_index);
             if (material.valid)
             {
                 OutputToggleString(x, y, "Autoselect", "a", check_autoselect(material, false), true, left_margin);
@@ -1124,7 +1124,7 @@ struct jobutils_hook : public df::viewscreen_dwarfmodest
                 }
             }
         }
-        else if (in_placement_stage() && ui_build_selector->building_subtype < 7)
+        else if (in_placement_stage() && buildreq->building_subtype < 7)
         {
             OutputString(COLOR_BROWN, x, y, "DFHack Options", true, left_margin);
             OutputToggleString(x, y, "Auto Mat-select", "a", auto_choose_materials, true, left_margin);

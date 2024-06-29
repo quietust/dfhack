@@ -32,7 +32,7 @@ end
 --[[print('Placing anchor...')
 
 do
-    local wp = df.global.ui.waypoints
+    local wp = df.global.plotinfo.waypoints
 
     for _,pt in ipairs(wp.points) do
         if pt.name == 'dfhack_anchor' then

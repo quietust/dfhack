@@ -135,9 +135,6 @@ bool dig (MapExtras::MapCache & MCache,
             }
             if (tsb == tiletype_shape_basic::Floor
                 && (type == tile_dig_designation::DownStair || type == tile_dig_designation::Channel)
-                && ts != tiletype_shape::BRANCH
-                && ts != tiletype_shape::TRUNK_BRANCH
-                && ts != tiletype_shape::TWIG
                 )
             {
                 std::cerr << "allowing tt" << (int)tt << ", is floor\n";
@@ -799,7 +796,7 @@ bool stamp_pattern (uint32_t bx, uint32_t by, int z_level,
             }
         }
     }
-    bl->flags.bits.designated = true;
+    bl->flags.set(block_flags::Designated);
     return true;
 };
 

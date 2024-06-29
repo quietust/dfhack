@@ -14,7 +14,7 @@
 
 // DF data structure definition headers
 #include "DataDefs.h"
-#include <df/ui.h>
+#include <df/plotinfost.h>
 #include <df/world.h>
 #include <df/unit.h>
 #include <df/unit_soul.h>
@@ -34,7 +34,7 @@
 #include <df/building_tradedepotst.h>
 #include <df/building_stockpilest.h>
 #include <df/items_other_id.h>
-#include <df/ui.h>
+#include <df/plotinfost.h>
 #include <df/activity_info.h>
 
 #include <MiscUtils.h>
@@ -55,7 +55,7 @@ using namespace df::enums;
 
 // idk what this does
 DFHACK_PLUGIN("autohauler");
-REQUIRE_GLOBAL(ui);
+REQUIRE_GLOBAL(plotinfo);
 REQUIRE_GLOBAL(world);
 
 /*
@@ -371,6 +371,8 @@ static const dwarf_state dwarf_states[] = {
     BUSY  /* RemoveStairs */,
     BUSY  /* ConstructQuern */,
     BUSY  /* ConstructMillstone */,
+    OTHER /* UpgradeSquadEquipment */,
+    OTHER /* PrepareEquipmentManifests */,
     BUSY  /* ConstructSplint */,
     BUSY  /* ConstructCrutch */,
     BUSY  /* ConstructTractionBench */,
@@ -384,20 +386,11 @@ static const dwarf_state dwarf_states[] = {
     BUSY  /* SpinThread */,
     BUSY  /* PenLargeAnimal */,
     BUSY  /* PenSmallAnimal */,
+    OTHER /* Unknown220 */,
     BUSY  /* MakeTool */,
     BUSY  /* CollectClay */,
     BUSY  /* InstallColonyInHive */,
     BUSY  /* CollectHiveProducts */,
-    OTHER /* CauseTrouble */,
-    OTHER /* DrinkBlood */,
-    OTHER /* ReportCrime */,
-    OTHER /* ExecuteCriminal */,
-    BUSY  /* TrainAnimal */,
-    BUSY  /* CarveTrack */,
-    BUSY  /* PushTrackVehicle */,
-    BUSY  /* PlaceTrackVehicle */,
-    BUSY  /* StoreItemInVehicle */,
-    BUSY  /* GeldAnimal */
 };
 
 // Mode assigned to labors. Either it's a hauling job, or it's not.
@@ -514,16 +507,6 @@ static const struct labor_default default_labor_infos[] = {
     /* PRESSING */              {ALLOW,   0},
     /* BEEKEEPING */            {ALLOW,   0},
     /* WAX_WORKING */           {ALLOW,   0},
-    /* HANDLE_VEHICLES */       {HAULERS, 0},
-    /* HAUL_TRADE */            {HAULERS, 0},
-    /* PULL_LEVER */            {HAULERS, 0},
-    /* REMOVE_CONSTRUCTION */   {HAULERS, 0},
-    /* HAUL_WATER */            {HAULERS, 0},
-    /* GELD */                  {ALLOW,   0},
-    /* BUILD_ROAD */            {HAULERS, 0},
-    /* BUILD_CONSTRUCTION */    {HAULERS, 0},
-    /* PAPERMAKING */           {ALLOW,   0},
-    /* BOOKBINDING */           {ALLOW,   0}
 };
 
 /**
@@ -788,8 +771,8 @@ DFhackCExport command_result plugin_onupdate ( color_ostream &out )
     step_count = 0;
 
     // xxx I don't know what this does
-    uint32_t race = ui->race_id;
-    uint32_t civ = ui->civ_id;
+    uint32_t race = plotinfo->race_id;
+    uint32_t civ = plotinfo->civ_id;
 
     // Create a vector of units. This will be populated in the following for loop.
     std::vector<df::unit *> dwarfs;

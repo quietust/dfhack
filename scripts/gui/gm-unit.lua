@@ -286,8 +286,8 @@ function editor_civ:init( args )
     widgets.Label{view_id="civ_name",frame = { t=1,l=1}, text="Currently: "..civ_name(self.target_unit.civ_id)},
     widgets.Label{frame = { t=2,l=1}, text={{text=": set to other (-1, usually enemy)",key="CUSTOM_N",
         on_activate= function() self.target_unit.civ_id=-1;self:update_curren_civ() end}}},
-    widgets.Label{frame = { t=3,l=1}, text={{text=": set to current civ("..df.global.ui.civ_id..")",key="CUSTOM_C",
-        on_activate= function() self.target_unit.civ_id=df.global.ui.civ_id;self:update_curren_civ() end}}},
+    widgets.Label{frame = { t=3,l=1}, text={{text=": set to current civ("..df.global.plotinfo.civ_id..")",key="CUSTOM_C",
+        on_activate= function() self.target_unit.civ_id=df.global.plotinfo.civ_id;self:update_curren_civ() end}}},
     widgets.Label{frame = { t=4,l=1}, text={{text=": manually enter",key="CUSTOM_E",
         on_activate=function ()
          dialog.showInputPrompt("Civ id","Enter new civ id:",COLOR_WHITE,

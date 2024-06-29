@@ -28,7 +28,7 @@ using namespace DFHack;
 DFHACK_PLUGIN("autogems");
 DFHACK_PLUGIN_IS_ENABLED(enabled);
 
-REQUIRE_GLOBAL(ui);
+REQUIRE_GLOBAL(plotinfo);
 REQUIRE_GLOBAL(world);
 
 typedef int32_t item_id;
@@ -86,7 +86,7 @@ void add_task(mat_index gem_type, df::building_workshopst *workshop) {
     job->mat_type = df::builtin_mats::INORGANIC;
     job->mat_index = gem_type;
     job->general_refs.push_back(ref);
-    job->job_items.push_back(item);
+    job->job_items.elements.push_back(item);
 
     workshop->jobs.push_back(job);
     Job::linkIntoWorld(job);
@@ -127,14 +127,12 @@ bool valid_gem(df::item* item) {
 void create_jobs() {
     // Creates jobs in Jeweler's Workshops as necessary.
     // Todo: Consider path availability?
-    std::set<item_id> stockpiled;
     std::set<df::building_workshopst*> unlinked;
     gem_map available;
     auto workshops = &world->buildings.other[df::buildings_other_id::WORKSHOP_JEWELER];
 
     for (auto w = workshops->begin(); w != workshops->end(); ++w) {
         auto workshop = virtual_cast<df::building_workshopst>(*w);
-        auto links = workshop->profile.links.take_from_pile;
 
         if (workshop->construction_stage < 3) {
             // Construction in progress.
@@ -146,50 +144,16 @@ void create_jobs() {
             continue;
         }
 
-        if (links.size() > 0) {
-            for (auto l = links.begin(); l != links.end() && workshop->jobs.size() <= MAX_WORKSHOP_JOBS; ++l) {
-                auto stockpile = virtual_cast<df::building_stockpilest>(*l);
-                gem_map piled;
-
-                Buildings::StockpileIterator stored;
-                for (stored.begin(stockpile); !stored.done(); ++stored) {
-                    auto item = *stored;
-                    if (valid_gem(item)) {
-                        stockpiled.insert(item->id);
-                        piled[item->getMaterialIndex()] += 1;
-                    }
-                }
-
-                // Decrement current jobs from all linked workshops, not just this one.
-                auto outbound = stockpile->links.give_to_workshop;
-                for (auto ws = outbound.begin(); ws != outbound.end(); ++ws) {
-                    auto shop = virtual_cast<df::building_workshopst>(*ws);
-                    for (auto j = shop->jobs.begin(); j != shop->jobs.end(); ++j) {
-                        auto job = *j;
-                        if (job->job_type == df::job_type::CutGems) {
-                            if (job->flags.bits.repeat) {
-                                piled[job->mat_index] = 0;
-                            } else {
-                                piled[job->mat_index] -= 1;
-                            }
-                        }
-                    }
-                }
-
-                add_tasks(piled, workshop);
+        // Note which gem types have already been ordered to be cut.
+        for (auto j = workshop->jobs.begin(); j != workshop->jobs.end(); ++j) {
+            auto job = *j;
+            if (job->job_type == df::job_type::CutGems) {
+                available[job->mat_index] -= job->flags.bits.repeat? 100: 1;
             }
-        } else {
-            // Note which gem types have already been ordered to be cut.
-            for (auto j = workshop->jobs.begin(); j != workshop->jobs.end(); ++j) {
-                auto job = *j;
-                if (job->job_type == df::job_type::CutGems) {
-                    available[job->mat_index] -= job->flags.bits.repeat? 100: 1;
-                }
-            }
+        }
 
-            if (workshop->jobs.size() <= MAX_WORKSHOP_JOBS) {
-                unlinked.insert(workshop);
-            }
+        if (workshop->jobs.size() <= MAX_WORKSHOP_JOBS) {
+            unlinked.insert(workshop);
         }
     }
 
@@ -199,7 +163,7 @@ void create_jobs() {
         auto gems = world->items.other[items_other_id::ROUGH];
         for (auto g = gems.begin(); g != gems.end(); ++g) {
             auto item = *g;
-            if (valid_gem(item) && !stockpiled.count(item->id)) {
+            if (valid_gem(item)) {
                 available[item->getMaterialIndex()] += 1;
             }
         }
@@ -228,7 +192,7 @@ struct autogem_hook : public df::viewscreen_dwarfmodest {
 
     bool in_menu() {
         // Determines whether we're looking at the Workshop Orders screen.
-        return ui->main.mode == ui_sidebar_mode::OrdersWorkshop;
+        return plotinfo->main.mode == ui_sidebar_mode::OrdersWorkshop;
     }
 
     bool handleInput(std::set<df::interface_key> *input) {

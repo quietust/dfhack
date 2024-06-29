@@ -21,15 +21,15 @@ function getPanelLayout()
     local area_x2 = sw-AREA_MAP_WIDTH-2
     local menu_x2 = sw-MENU_WIDTH-2
     local menu_x1 = area_x2-MENU_WIDTH-1
-    local area_pos = df.global.ui_area_map_width
-    local menu_pos = df.global.ui_menu_width
+    local area_pos = df.global.ui_menu_width[1]
+    local menu_pos = df.global.ui_menu_width[0]
     local rv = {}
 
     if area_pos < 3 then
         rv.area_map = gui.mkdims_xy(area_x2+1,1,view_rb-1,view_height)
         view_rb = area_x2
     end
-    if menu_pos < area_pos or df.global.ui.main.mode ~= 0 then
+    if menu_pos < area_pos or df.global.plotinfo.main.mode ~= 0 then
         if menu_pos >= area_pos then
             rv.menu_forced = true
             menu_pos = area_pos-1
@@ -240,13 +240,13 @@ end
 
 HOTKEY_KEYS = {}
 
-for i,v in ipairs(df.global.ui.main.hotkeys) do
+for i,v in ipairs(df.global.plotinfo.main.hotkeys) do
     HOTKEY_KEYS['D_HOTKEY'..(i+1)] = v
 end
 
 local function get_hotkey_target(key)
     local hk = HOTKEY_KEYS[key]
-    if hk and hk.cmd == df.ui_hotkey.T_cmd.Zoom then
+    if hk and hk.cmd == df.plotinfo_hotkey.T_cmd.Zoom then
         return xyz2pos(hk.x, hk.y, hk.z)
     end
 end

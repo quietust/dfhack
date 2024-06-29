@@ -33,7 +33,7 @@ distribution.
 #include <set>
 
 #include "DataDefs.h"
-#include "df/graphic.h"
+#include "df/graphicst.h"
 #include "df/viewscreen.h"
 
 #include "modules/GuiHooks.h"

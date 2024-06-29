@@ -160,7 +160,7 @@ function AssignRack:onSubmit(idx, choice)
     end
 
     self.building.specific_squad = -1
-    df.global.ui.equipment.update.buildings = true
+    df.global.plotinfo.equipment.update.buildings = true
 
     local new = df.squad.find(choice.obj.id)
     if new and choice.obj.id ~= curid then

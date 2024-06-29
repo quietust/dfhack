@@ -10,7 +10,7 @@ struct title_start_rename_hook : df::viewscreen_titlest {
     static bool rename_failed;
     static std::string entry;
 
-    inline df::viewscreen_titlest::T_start_savegames *get_cur_save()
+    inline df::region_headerst *get_cur_save()
     {
         return vector_get(start_savegames, sel_submenu_line);
     }
@@ -27,9 +27,9 @@ struct title_start_rename_hook : df::viewscreen_titlest {
             return false;
         if (Filesystem::isdir(full_save_dir(entry)))
             return false;
-        if (rename(full_save_dir(save->save_dir).c_str(), full_save_dir(entry).c_str()) != 0)
+        if (rename(full_save_dir(save->folder_name).c_str(), full_save_dir(entry).c_str()) != 0)
             return false;
-        save->save_dir = entry;
+        save->folder_name = entry;
         entry = "";
         return true;
     }

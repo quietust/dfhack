@@ -42,7 +42,7 @@ using namespace std;
 #include "MiscUtils.h"
 
 #include "df/world.h"
-#include "df/ui.h"
+#include "df/plotinfost.h"
 #include "df/item.h"
 #include "df/creature_raw.h"
 #include "df/caste_raw.h"
@@ -63,12 +63,13 @@ using namespace std;
 #include "df/physical_attribute_type.h"
 #include "df/mental_attribute_type.h"
 #include <df/color_modifier_raw.h>
+#include "df/plant_material_def.h"
 
 using namespace DFHack;
 using namespace df::enums;
 
 using df::global::world;
-using df::global::ui;
+using df::global::plotinfo;
 
 bool MaterialInfo::decode(df::item *item)
 {
@@ -239,9 +240,9 @@ bool MaterialInfo::findInorganic(const std::string &token)
     }
 
     df::world_raws &raws = world->raws;
-    for (size_t i = 0; i < raws.inorganics.size(); i++)
+    for (size_t i = 0; i < raws.inorganics.all.size(); i++)
     {
-        df::inorganic_raw *p = raws.inorganics[i];
+        df::inorganic_raw *p = raws.inorganics.all[i];
         if (p->id == token)
             return decode(0, i);
     }
@@ -261,7 +262,7 @@ bool MaterialInfo::findPlant(const std::string &token, const std::string &subtok
 
         // As a special exception, return the structural material with empty subtoken
         if (subtoken.empty())
-            return decode(p->material_defs.type_basic_mat, p->material_defs.idx_basic_mat);
+            return decode(p->material_defs.type[df::plant_material_def::basic_mat], p->material_defs.idx[df::plant_material_def::basic_mat]);
 
         for (size_t j = 0; j < p->material.size(); j++)
             if (p->material[j]->id == subtoken)
@@ -439,6 +440,7 @@ bool MaterialInfo::matches(const df::dfhack_material_category &cat)
         return true;
     if (cat.bits.milk && linear_index(material->reaction_product.id, std::string("CHEESE_MAT")) >= 0)
         return true;
+    TEST(gem, IS_GEM);
     return false;
 }
 
@@ -510,10 +512,18 @@ void MaterialInfo::getMatchBits(df::job_item_flags2 &ok, df::job_item_flags2 &ma
     TEST(sewn_imageless, is_cloth);
     TEST(glass_making, MAT_FLAG(CRYSTAL_GLASSABLE));
 
-    TEST(fire_safe, material->heat.melting_point > 11000);
-    TEST(magma_safe, material->heat.melting_point > 12000);
+    TEST(fire_safe, material->heat.melting_point > 11000
+                    && material->heat.boiling_point > 11000
+                    && material->heat.ignite_point > 11000
+                    && material->heat.heatdam_point > 11000
+                    && (material->heat.colddam_point == 60001 || material->heat.colddam_point < 11000));
+    TEST(magma_safe, material->heat.melting_point > 12000
+                    && material->heat.boiling_point > 12000
+                    && material->heat.ignite_point > 12000
+                    && material->heat.heatdam_point > 12000
+                    && (material->heat.colddam_point == 60001 || material->heat.colddam_point < 12000));
     TEST(deep_material, FLAG(inorganic, inorganic_flags::SPECIAL));
-    TEST(non_economic, !inorganic || !(ui && vector_get(ui->economic_stone, index)));
+    TEST(non_economic, !inorganic || !(plotinfo && vector_get(plotinfo->economic_stone, index)));
 
     TEST(plant, plant);
     TEST(silk, MAT_FLAG(SILK));
@@ -638,12 +648,12 @@ bool t_matglossInorganic::isGem()
 
 bool Materials::CopyInorganicMaterials (std::vector<t_matglossInorganic> & inorganic)
 {
-    size_t size = world->raws.inorganics.size();
+    size_t size = world->raws.inorganics.all.size();
     inorganic.clear();
     inorganic.reserve (size);
     for (size_t i = 0; i < size;i++)
     {
-        df::inorganic_raw *orig = world->raws.inorganics[i];
+        df::inorganic_raw *orig = world->raws.inorganics.all[i];
         t_matglossInorganic mat;
         mat.id = orig->id;
         mat.name = orig->material.stone_name;
@@ -733,7 +743,7 @@ bool Materials::ReadOthers(void)
 
 bool Materials::ReadDescriptorColors (void)
 {
-    size_t size = world->raws.language.colors.size();
+    size_t size = world->raws.descriptors.colors.size();
 
     color.clear();
     if(size == 0)
@@ -741,7 +751,7 @@ bool Materials::ReadDescriptorColors (void)
     color.reserve(size);
     for (size_t i = 0; i < size;i++)
     {
-        df::descriptor_color *c = world->raws.language.colors[i];
+        df::descriptor_color *c = world->raws.descriptors.colors[i];
         t_descriptor_color col;
         col.id = c->id;
         col.name = c->name;
@@ -751,13 +761,13 @@ bool Materials::ReadDescriptorColors (void)
         color.push_back(col);
     }
 
-    size = world->raws.language.patterns.size();
+    size = world->raws.descriptors.patterns.size();
     alldesc.clear();
     alldesc.reserve(size);
     for (size_t i = 0; i < size;i++)
     {
         t_matgloss mat;
-        mat.id = world->raws.language.patterns[i]->id;
+        mat.id = world->raws.descriptors.patterns[i]->id;
         alldesc.push_back(mat);
     }
     return true;
@@ -809,7 +819,7 @@ bool Materials::ReadCreatureTypesEx (void)
             }
 
             // body parts
-            caste.bodypart.empty();
+            caste.bodypart.clear();
             size_t sizebp = ca->body_info.body_parts.size();
             for (size_t k = 0; k < sizebp; k++)
             {

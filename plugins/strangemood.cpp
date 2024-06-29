@@ -14,7 +14,7 @@
 #include "DataDefs.h"
 #include "df/d_init.h"
 #include "df/world.h"
-#include "df/ui.h"
+#include "df/plotinfost.h"
 #include "df/unit.h"
 #include "df/unit_soul.h"
 #include "df/unit_skill.h"
@@ -29,6 +29,7 @@
 #include "df/creature_raw.h"
 #include "df/caste_raw.h"
 #include "df/caste_raw_flags.h"
+#include "df/unit_relationship_type.h"
 
 using std::string;
 using std::vector;
@@ -38,7 +39,7 @@ using namespace df::enums;
 DFHACK_PLUGIN("strangemood");
 
 REQUIRE_GLOBAL(world);
-REQUIRE_GLOBAL(ui);
+REQUIRE_GLOBAL(plotinfo);
 REQUIRE_GLOBAL(d_init);
 REQUIRE_GLOBAL(created_item_count);
 REQUIRE_GLOBAL(created_item_type);
@@ -58,8 +59,6 @@ bool isUnitMoodable (df::unit *unit)
     if (unit->mood != mood_type::None)
         return false;
     if (!ENUM_ATTR(profession,moodable,unit->profession))
-        return false;
-    if (!Units::casteFlagSet(unit->race, unit->caste, caste_raw_flags::STRANGE_MOODS))
         return false;
     return true;
 }
@@ -109,11 +108,11 @@ df::job_skill getMoodSkill (df::unit *unit)
     }
     if (!skills.size() && civ)
     {
-        if (civ->resources.permitted_skill[job_skill::WOODCRAFT])
+        if (civ->entity_raw->jobs.permitted_skill[job_skill::WOODCRAFT])
             skills.push_back(job_skill::WOODCRAFT);
-        if (civ->resources.permitted_skill[job_skill::STONECRAFT])
+        if (civ->entity_raw->jobs.permitted_skill[job_skill::STONECRAFT])
             skills.push_back(job_skill::STONECRAFT);
-        if (civ->resources.permitted_skill[job_skill::BONECARVE])
+        if (civ->entity_raw->jobs.permitted_skill[job_skill::BONECARVE])
             skills.push_back(job_skill::BONECARVE);
     }
     if (!skills.size())
@@ -134,13 +133,13 @@ int getCreatedMetalBars (int32_t idx)
     return 0;
 }
 
-void selectWord (const df::language_word_table &table, int32_t &word, df::enum_field<df::part_of_speech,int16_t> &part, int mode)
+void selectWord (const df::language_word_table &table, int32_t &word, df::part_of_speech &part, int mode)
 {
     if (table.parts[mode].size())
     {
         int offset = rng.df_trandom(table.parts[mode].size());
         word = table.words[mode][offset];
-        part = table.parts[mode][offset];
+        part = (df::part_of_speech)table.parts[mode][offset].value;
     }
     else
     {
@@ -150,113 +149,40 @@ void selectWord (const df::language_word_table &table, int32_t &word, df::enum_f
     }
 }
 
-void generateName(df::language_name &output, int language, int mode, const df::language_word_table &table1, const df::language_word_table &table2)
+void generateName(df::language_name &output, int language, const df::language_word_table &table1, const df::language_word_table &table2)
 {
     for (int i = 0; i < 100; i++)
     {
-        if (mode != 8 && mode != 9)
-        {
-            output = df::language_name();
-            if (language == -1)
-                language = rng.df_trandom(world->raws.language.translations.size());
-            output.unknown = mode;
-            output.language = language;
-        }
+        output = df::language_name();
+        if (language == -1)
+            language = rng.df_trandom(world->raws.language.translations.size());
+        output.type = language_name_type::Artifact;
+        output.language = language;
         output.has_name = 1;
         if (output.language == -1)
             output.language = rng.df_trandom(world->raws.language.translations.size());
         int r, r2, r3;
-        switch (mode)
+        r = rng.df_trandom(3);
+        if (r == 0 || r == 1)
         {
-        case 0: case 9: case 10:
-            if (mode != 9)
+            if (rng.df_trandom(2))
             {
-                int32_t word; df::enum_field<df::part_of_speech,int16_t> part;
-                output.first_name.clear();
-                selectWord(table1, word, part, 2);
-                if (word >= 0 && word < world->raws.language.words.size())
-                    output.first_name = *world->raws.language.translations[language]->words[word];
+                selectWord(table2, output.words[0], output.parts_of_speech[0], 0);
+                selectWord(table1, output.words[1], output.parts_of_speech[1], 1);
             }
-            if (mode != 10)
+            else
             {
-        case 4: case 37: // this is not a typo
-                if (rng.df_trandom(2))
-                {
-                    selectWord(table2, output.words[0], output.parts_of_speech[0], 0);
-                    selectWord(table1, output.words[1], output.parts_of_speech[1], 1);
-                }
-                else
-                {
-                    selectWord(table1, output.words[0], output.parts_of_speech[0], 0);
-                    selectWord(table2, output.words[1], output.parts_of_speech[1], 1);
-                }
+                selectWord(table1, output.words[0], output.parts_of_speech[0], 0);
+                selectWord(table2, output.words[1], output.parts_of_speech[1], 1);
             }
-            break;
-
-        case 1: case 13: case 20:
-            r = rng.df_trandom(3);
-            if (r == 0 || r == 1)
-            {
-                if (rng.df_trandom(2))
-                {
-                    selectWord(table2, output.words[0], output.parts_of_speech[0], 0);
-                    selectWord(table1, output.words[1], output.parts_of_speech[1], 1);
-                }
-                else
-                {
-                    selectWord(table1, output.words[0], output.parts_of_speech[0], 0);
-                    selectWord(table2, output.words[1], output.parts_of_speech[1], 1);
-                }
-            }
-            if (r == 1 || r == 2)
-            {
-        case 3: case 8: case 11: // this is not a typo either
-                r2 = rng.df_trandom(2);
-                if (r2)
-                    selectWord(table1, output.words[5], output.parts_of_speech[5], 2);
-                else
-                    selectWord(table2, output.words[5], output.parts_of_speech[5], 2);
-                r3 = rng.df_trandom(3);
-                if (rng.df_trandom(50))
-                    r3 = rng.df_trandom(2);
-                switch (r3)
-                {
-                case 0:
-                case 2:
-                    if (r3 == 2)
-                        r2 = rng.df_trandom(2);
-                    if (r2)
-                        selectWord(table2, output.words[6], output.parts_of_speech[6], 5);
-                    else
-                        selectWord(table1, output.words[6], output.parts_of_speech[6], 5);
-                    if (r3 == 0)
-                        break;
-                    r2 = -r2;
-                case 1:
-                    if (r2)
-                        selectWord(table1, output.words[2], output.parts_of_speech[2], 3);
-                    else
-                        selectWord(table2, output.words[2], output.parts_of_speech[2], 3);
-                    if (!(rng.df_trandom(100)))
-                        selectWord(table1, output.words[3], output.parts_of_speech[3], 3);
-                    break;
-                }
-            }
-            if (rng.df_trandom(100))
-            {
-                if (rng.df_trandom(2))
-                    selectWord(table1, output.words[4], output.parts_of_speech[4], 4);
-                else
-                    selectWord(table2, output.words[4], output.parts_of_speech[4], 4);
-            }
-            if ((mode == 3) && (output.parts_of_speech[5] == part_of_speech::Noun) && (output.words[5] != -1) && (world->raws.language.words[output.words[5]]->forms[1].length()))
-                output.parts_of_speech[5] = part_of_speech::NounPlural;
-            break;
-
-        case 2: case 5: case 6: case 12: case 14: case 15: case 16: case 17: case 18: case 19:
-        case 21: case 22: case 23: case 24: case 25: case 26: case 27: case 28: case 29: case 30:
-        case 31: case 32: case 33: case 34: case 35: case 36: case 38: case 39:
-            selectWord(table1, output.words[5], output.parts_of_speech[5], 2);
+        }
+        if (r == 1 || r == 2)
+        {
+            r2 = rng.df_trandom(2);
+            if (r2)
+                selectWord(table1, output.words[5], output.parts_of_speech[5], 2);
+            else
+                selectWord(table2, output.words[5], output.parts_of_speech[5], 2);
             r3 = rng.df_trandom(3);
             if (rng.df_trandom(50))
                 r3 = rng.df_trandom(2);
@@ -264,53 +190,31 @@ void generateName(df::language_name &output, int language, int mode, const df::l
             {
             case 0:
             case 2:
-                selectWord(table2, output.words[6], output.parts_of_speech[6], 5);
+                if (r3 == 2)
+                    r2 = rng.df_trandom(2);
+                if (r2)
+                    selectWord(table2, output.words[6], output.parts_of_speech[6], 5);
+                else
+                    selectWord(table1, output.words[6], output.parts_of_speech[6], 5);
                 if (r3 == 0)
                     break;
+                r2 = -r2;
             case 1:
-                selectWord(table2, output.words[2], output.parts_of_speech[2], 3);
+                if (r2)
+                    selectWord(table1, output.words[2], output.parts_of_speech[2], 3);
+                else
+                    selectWord(table2, output.words[2], output.parts_of_speech[2], 3);
                 if (!(rng.df_trandom(100)))
-                    selectWord(table2, output.words[3], output.parts_of_speech[3], 3);
+                    selectWord(table1, output.words[3], output.parts_of_speech[3], 3);
                 break;
             }
-            if (rng.df_trandom(100))
+        }
+        if (rng.df_trandom(100))
+        {
+            if (rng.df_trandom(2))
+                selectWord(table1, output.words[4], output.parts_of_speech[4], 4);
+            else
                 selectWord(table2, output.words[4], output.parts_of_speech[4], 4);
-            break;
-
-        case 7:
-            r = rng.df_trandom(3);
-            if (r == 0 || r == 1)
-            {
-                selectWord(table2, output.words[0], output.parts_of_speech[0], 0);
-                selectWord(table1, output.words[1], output.parts_of_speech[1], 1);
-            }
-            if (r == 1 || r == 2)
-            {
-                r2 = rng.df_trandom(2);
-                if (r == 2 || r2 == 1)
-                    selectWord(table1, output.words[5], output.parts_of_speech[5], 2);
-                else
-                    selectWord(table2, output.words[5], output.parts_of_speech[5], 2);
-                r3 = rng.df_trandom(3);
-                if (rng.df_trandom(50))
-                    r3 = rng.df_trandom(2);
-                switch (r3)
-                {
-                case 0:
-                case 2:
-                    selectWord(table1, output.words[6], output.parts_of_speech[6], 5);
-                    if (r3 == 0)
-                        break;
-                case 1:
-                    selectWord(table2, output.words[2], output.parts_of_speech[2], 3);
-                    if (!(rng.df_trandom(100)))
-                        selectWord(table2, output.words[3], output.parts_of_speech[3], 3);
-                    break;
-                }
-            }
-            if (rng.df_trandom(100))
-                selectWord(table2, output.words[4], output.parts_of_speech[4], 4);
-            break;
         }
         if (output.words[2] != -1 && output.words[3] != -1 &&
             world->raws.language.words[output.words[3]]->adj_dist < world->raws.language.words[output.words[2]]->adj_dist)
@@ -476,7 +380,7 @@ command_result df_strangemood (color_ostream &out, vector <string> & parameters)
     CoreSuspender suspend;
 
     // First, check if moods are enabled at all
-    if (!d_init->flags4.is_set(d_init_flags4::ARTIFACTS))
+    if (!d_init->feature.flags.is_set(d_init_flags4::ARTIFACTS))
     {
         out.printerr("ARTIFACTS are not enabled!\n");
         return CR_FAILURE;
@@ -486,7 +390,7 @@ command_result df_strangemood (color_ostream &out, vector <string> & parameters)
         out.printerr("Strange moods disabled via debug flag!\n");
         return CR_FAILURE;
     }
-    if (ui->mood_cooldown && !force)
+    if (plotinfo->mood_cooldown && !force)
     {
         out.printerr("Last strange mood happened too recently!\n");
         return CR_FAILURE;
@@ -498,7 +402,7 @@ command_result df_strangemood (color_ostream &out, vector <string> & parameters)
         df::unit *cur = world->units.active[i];
         if (Units::isCitizen(cur) && cur->flags1.bits.has_mood)
         {
-            ui->mood_cooldown = 1000;
+            plotinfo->mood_cooldown = 1000;
             out.printerr("A strange mood is already in progress!\n");
             return CR_FAILURE;
         }
@@ -558,12 +462,12 @@ command_result df_strangemood (color_ostream &out, vector <string> & parameters)
                     if (blk->designation[x][y].bits.subterranean && !blk->designation[x][y].bits.hidden)
                         num_revealed_tiles++;
         }
-        if (num_revealed_tiles / 2304 < ui->tasks.num_artifacts)
+        if (num_revealed_tiles / 2304 < plotinfo->tasks.num_artifacts)
         {
             out.printerr("Fortress is not eligible for a strange mood at this time - not enough subterranean tiles revealed.\n");
             return CR_FAILURE;
         }
-        if (num_items / 200 < ui->tasks.num_artifacts)
+        if (num_items / 200 < plotinfo->tasks.num_artifacts)
         {
             out.printerr("Fortress is not eligible for a strange mood at this time - not enough items created\n");
             return CR_FAILURE;
@@ -579,9 +483,9 @@ command_result df_strangemood (color_ostream &out, vector <string> & parameters)
             df::unit *cur = moodable_units[i];
             if (cur->flags1.bits.had_mood)
                 continue;
-            if (cur->relations.dragger_id != -1)
+            if (cur->relationship_ids[unit_relationship_type::Dragger] != -1)
                 continue;
-            if (cur->relations.draggee_id != -1)
+            if (cur->relationship_ids[unit_relationship_type::Draggee] != -1)
                 continue;
             tickets.push_back(i);
             for (int j = 0; j < 5; j++)
@@ -634,15 +538,11 @@ command_result df_strangemood (color_ostream &out, vector <string> & parameters)
         return CR_FAILURE;
     }
 
-    ui->mood_cooldown = 1000;
+    plotinfo->mood_cooldown = 1000;
     // If no mood type was specified, pick one randomly
     if (type == mood_type::None)
     {
-        if (soul && (
-            (soul->personality.stress_level >= 500000) ||
-            (soul->personality.stress_level >= 250000 && !rng.df_trandom(2)) ||
-            (soul->personality.stress_level >= 100000 && !rng.df_trandom(10))
-            ))
+        if (rng.df_trandom(100) > unit->status.happiness)
         {
             switch (rng.df_trandom(2))
             {
@@ -699,7 +599,7 @@ command_result df_strangemood (color_ostream &out, vector <string> & parameters)
     }
 
     unit->mood = type;
-    unit->relations.mood_copy = unit->mood;
+    unit->mood_copy = unit->mood;
     Gui::showAutoAnnouncement(announcement_type::STRANGE_MOOD, unit->pos, msg, color, bright);
 
     // TODO: make sure unit drops any wrestle items
@@ -733,8 +633,6 @@ command_result df_strangemood (color_ostream &out, vector <string> & parameters)
         case job_skill::WOODCRAFT:
         case job_skill::STONECRAFT:
         case job_skill::BONECARVE:
-        case job_skill::PAPERMAKING:    // These aren't actually moodable skills
-        case job_skill::BOOKBINDING:    // but the game still checks for them anyways
             job->job_type = job_type::StrangeMoodCrafter;
             break;
         case job_skill::TANNER:
@@ -797,7 +695,7 @@ command_result df_strangemood (color_ostream &out, vector <string> & parameters)
     df::job_item *item;
     if (job->job_type == job_type::StrangeMoodFell)
     {
-        job->job_items.push_back(item = new df::job_item());
+        job->job_items.elements.push_back(item = new df::job_item());
         item->item_type = item_type::CORPSE;
         item->flags1.bits.allow_buryable = true;
         item->flags1.bits.murdered = true;
@@ -809,20 +707,20 @@ command_result df_strangemood (color_ostream &out, vector <string> & parameters)
         switch (rng.df_trandom(3))
         {
         case 0:
-            job->job_items.push_back(item = new df::job_item());
+            job->job_items.elements.push_back(item = new df::job_item());
             item->item_type = item_type::REMAINS;
             item->flags1.bits.allow_buryable = true;
             item->quantity = 1;
             break;
         case 1:
-            job->job_items.push_back(item = new df::job_item());
+            job->job_items.elements.push_back(item = new df::job_item());
             item->flags1.bits.allow_buryable = true;
             item->flags2.bits.bone = true;
             item->flags2.bits.body_part = true;
             item->quantity = 1;
             break;
         case 2:
-            job->job_items.push_back(item = new df::job_item());
+            job->job_items.elements.push_back(item = new df::job_item());
             item->flags1.bits.allow_buryable = true;
             item->flags2.bits.totemable = true;
             item->flags2.bits.body_part = true;
@@ -841,7 +739,7 @@ command_result df_strangemood (color_ostream &out, vector <string> & parameters)
         case job_skill::MASONRY:
         case job_skill::STONECRAFT:
         case job_skill::MECHANICS:
-            job->job_items.push_back(item = new df::job_item());
+            job->job_items.elements.push_back(item = new df::job_item());
             item->item_type = item_type::BOULDER;
             item->quantity = base_item_count;
             item->flags3.bits.hard = true;
@@ -868,16 +766,14 @@ command_result df_strangemood (color_ostream &out, vector <string> & parameters)
         case job_skill::CARPENTRY:
         case job_skill::WOODCRAFT:
         case job_skill::BOWYER:
-        case job_skill::PAPERMAKING:
-        case job_skill::BOOKBINDING:
-            job->job_items.push_back(item = new df::job_item());
+            job->job_items.elements.push_back(item = new df::job_item());
             item->item_type = item_type::WOOD;
             item->quantity = base_item_count;
             break;
 
         case job_skill::TANNER:
         case job_skill::LEATHERWORK:
-            job->job_items.push_back(item = new df::job_item());
+            job->job_items.elements.push_back(item = new df::job_item());
             item->item_type = item_type::SKIN_TANNED;
             item->quantity = base_item_count;
             break;
@@ -885,10 +781,10 @@ command_result df_strangemood (color_ostream &out, vector <string> & parameters)
         case job_skill::WEAVING:
         case job_skill::CLOTHESMAKING:
             filter = NULL;
-            // TODO: do proper search through world->items.other[items_other_id::ANY_GENERIC36] for item_type CLOTH, mat_type 0, flags2.deep_material, and min_dimension 10000
-            for (size_t i = 0; i < world->items.other[items_other_id::ANY_GENERIC36].size(); i++)
+            // TODO: do proper search through world->items.other[items_other_id::ANY_GOES_IN_CHEST] for item_type CLOTH, mat_type 0, flags2.deep_material, and min_dimension 10000
+            for (size_t i = 0; i < world->items.other[items_other_id::ANY_GOES_IN_CHEST].size(); i++)
             {
-                filter = world->items.other[items_other_id::ANY_GENERIC36][i];
+                filter = world->items.other[items_other_id::ANY_GOES_IN_CHEST][i];
                 if (filter->getType() != item_type::CLOTH)
                 {
                     filter = NULL;
@@ -913,7 +809,7 @@ command_result df_strangemood (color_ostream &out, vector <string> & parameters)
             }
             if (filter)
             {
-                job->job_items.push_back(item = new df::job_item());
+                job->job_items.elements.push_back(item = new df::job_item());
                 item->item_type = item_type::CLOTH;
                 item->mat_type = filter->getMaterial();
                 item->mat_index = filter->getMaterialIndex();
@@ -922,7 +818,7 @@ command_result df_strangemood (color_ostream &out, vector <string> & parameters)
             }
             else
             {
-                job->job_items.push_back(item = new df::job_item());
+                job->job_items.elements.push_back(item = new df::job_item());
                 item->item_type = item_type::CLOTH;
                 bool found_pref = false;
                 if (soul)
@@ -973,10 +869,10 @@ command_result df_strangemood (color_ostream &out, vector <string> & parameters)
         case job_skill::FORGE_FURNITURE:
         case job_skill::METALCRAFT:
             filter = NULL;
-            // TODO: do proper search through world->items.other[items_other_id::ANY_GENERIC36] for item_type BAR, mat_type 0, and flags2.deep_material
-            for (size_t i = 0; i < world->items.other[items_other_id::ANY_GENERIC36].size(); i++)
+            // TODO: do proper search through world->items.other[items_other_id::ANY_GOES_IN_CHEST] for item_type BAR, mat_type 0, and flags2.deep_material
+            for (size_t i = 0; i < world->items.other[items_other_id::ANY_GOES_IN_CHEST].size(); i++)
             {
-                filter = world->items.other[items_other_id::ANY_GENERIC36][i];
+                filter = world->items.other[items_other_id::ANY_GOES_IN_CHEST][i];
                 if (filter->getType() != item_type::BAR)
                 {
                     filter = NULL;
@@ -996,7 +892,7 @@ command_result df_strangemood (color_ostream &out, vector <string> & parameters)
             }
             if (filter)
             {
-                job->job_items.push_back(item = new df::job_item());
+                job->job_items.elements.push_back(item = new df::job_item());
                 item->item_type = item_type::BAR;
                 item->mat_type = filter->getMaterial();
                 item->mat_index = filter->getMaterialIndex();
@@ -1005,7 +901,7 @@ command_result df_strangemood (color_ostream &out, vector <string> & parameters)
             }
             else
             {
-                job->job_items.push_back(item = new df::job_item());
+                job->job_items.elements.push_back(item = new df::job_item());
                 item->item_type = item_type::BAR;
                 item->mat_type = 0;
                 vector<int32_t> mats;
@@ -1029,14 +925,14 @@ command_result df_strangemood (color_ostream &out, vector <string> & parameters)
 
         case job_skill::CUTGEM:
         case job_skill::ENCRUSTGEM:
-            job->job_items.push_back(item = new df::job_item());
+            job->job_items.elements.push_back(item = new df::job_item());
             item->item_type = item_type::ROUGH;
             item->mat_type = 0;
             item->quantity = base_item_count;
             break;
 
         case job_skill::GLASSMAKER:
-            job->job_items.push_back(item = new df::job_item());
+            job->job_items.elements.push_back(item = new df::job_item());
             item->item_type = item_type::ROUGH;
             found_pref = false;
             if (soul)
@@ -1082,7 +978,7 @@ command_result df_strangemood (color_ostream &out, vector <string> & parameters)
                         MaterialInfo mat(pref->mattype, pref->matindex);
                         if (mat.material->flags.is_set(material_flags::BONE))
                         {
-                            job->job_items.push_back(item = new df::job_item());
+                            job->job_items.elements.push_back(item = new df::job_item());
                             item->flags2.bits.bone = true;
                             item->flags2.bits.body_part = true;
                             found_pref = true;
@@ -1090,7 +986,7 @@ command_result df_strangemood (color_ostream &out, vector <string> & parameters)
                         }
                         else if (mat.material->flags.is_set(material_flags::SHELL))
                         {
-                            job->job_items.push_back(item = new df::job_item());
+                            job->job_items.elements.push_back(item = new df::job_item());
                             item->flags2.bits.shell = true;
                             item->flags2.bits.body_part = true;
                             found_pref = true;
@@ -1101,7 +997,7 @@ command_result df_strangemood (color_ostream &out, vector <string> & parameters)
             }
             if (!found_pref)
             {
-                job->job_items.push_back(item = new df::job_item());
+                job->job_items.elements.push_back(item = new df::job_item());
                 item->flags2.bits.bone = true;
                 item->flags2.bits.body_part = true;
                 found_pref = true;
@@ -1118,7 +1014,7 @@ command_result df_strangemood (color_ostream &out, vector <string> & parameters)
          (job->job_type == job_type::StrangeMoodFell)
        ))
     {
-        int extra_items = std::min(rng.df_trandom((ui->tasks.num_artifacts * 20 + moodable_units.size()) / 20 + 1), 7);
+        int extra_items = std::min(rng.df_trandom((plotinfo->tasks.num_artifacts * 20 + moodable_units.size()) / 20 + 1), 7);
         df::item_type avoid_type = item_type::NONE;
         int avoid_glass = 0;
         switch (skill)
@@ -1162,13 +1058,13 @@ command_result df_strangemood (color_ostream &out, vector <string> & parameters)
                 switch (rng.df_trandom(2))
                 {
                 case 0:
-                    job->job_items.push_back(item = new df::job_item());
+                    job->job_items.elements.push_back(item = new df::job_item());
                     item->item_type = item_type::REMAINS;
                     item->flags1.bits.allow_buryable = true;
                     item->quantity = 1;
                     break;
                 case 1:
-                    job->job_items.push_back(item = new df::job_item());
+                    job->job_items.elements.push_back(item = new df::job_item());
                     item->flags1.bits.allow_buryable = true;
                     item->flags2.bits.bone = true;
                     item->flags2.bits.body_part = true;
@@ -1252,7 +1148,7 @@ command_result df_strangemood (color_ostream &out, vector <string> & parameters)
                         }
                         break;
                     }
-                    item = job->job_items[0];
+                    item = job->job_items.elements[0];
                     if (item->item_type == item_type && item->mat_type == mat_type)
                         continue;
                     if (item_type == avoid_type)
@@ -1267,7 +1163,7 @@ command_result df_strangemood (color_ostream &out, vector <string> & parameters)
                         continue;
                     break;
                 } while (1);
-                job->job_items.push_back(item = new df::job_item());
+                job->job_items.elements.push_back(item = new df::job_item());
                 item->item_type = item_type;
                 item->mat_type = mat_type;
                 item->flags2.whole = flags2.whole;
@@ -1299,18 +1195,18 @@ command_result df_strangemood (color_ostream &out, vector <string> & parameters)
     ref->setID(unit->id);
     job->general_refs.push_back(ref);
     unit->job.current_job = job;
-    job->wait_timer = 0;
+    job->completion_timer = 0;
 
     // Generate the artifact's name
     if (type == mood_type::Fell || type == mood_type::Macabre)
-        generateName(unit->status.artifact_name, unit->name.language, 1, world->raws.language.word_table[0][2], world->raws.language.word_table[1][2]);
+        generateName(unit->status.artifact_name, unit->name.language, world->raws.language.word_table[0][2], world->raws.language.word_table[1][2]);
     else
     {
-        generateName(unit->status.artifact_name, unit->name.language, 1, world->raws.language.word_table[0][1], world->raws.language.word_table[1][1]);
+        generateName(unit->status.artifact_name, unit->name.language, world->raws.language.word_table[0][1], world->raws.language.word_table[1][1]);
         if (!rng.df_trandom(100))
             unit->status.artifact_name = unit->name;
     }
-    unit->unk_18e = 0;
+    unit->moodstage = mood_stage_type::INITIAL;
     return CR_OK;
 }
 

@@ -100,14 +100,14 @@ end
 
 function make_citizen(unit)
     local dfg = df.global
-    local civ_id = dfg.ui.civ_id
-    local group_id = dfg.ui.group_id
+    local civ_id = dfg.plotinfo.civ_id
+    local group_id = dfg.plotinfo.group_id
     local events = dfg.world.history.events
-    local fortent = dfg.ui.main.fortress_entity
+    local fortent = dfg.plotinfo.main.fortress_entity
     local civent = fortent and df.historical_entity.find(fortent.entity_links[0].target)
         -- utils.binsearch(dfg.world.entities.all, fortent.entity_links[0].target, 'id')
     local event
-    local region_pos = df.world_site.find(dfg.ui.site_id).pos -- used with state events and hf state
+    local region_pos = df.world_site.find(dfg.plotinfo.site_id).pos -- used with state events and hf state
 
     local hf
     -- assume that hf id 1 and hf id 2 are equal.  I am unaware of instances of when they are not.
@@ -170,7 +170,7 @@ function make_citizen(unit)
         --unk_14.region_id = -1; unk_14.beast_id = -1; unk_14.unk_14 = 0
         hf.info.unk_14.unk_18 = -1; hf.info.unk_14.unk_1c = -1
         -- set values that seem related to state and do event
-        change_state(hf, dfg.ui.site_id, region_pos)
+        change_state(hf, dfg.plotinfo.site_id, region_pos)
 
 
         --lets skip skills for now
@@ -210,7 +210,7 @@ function make_citizen(unit)
         end
 
         if hf.info and hf.info.unk_14 then
-            change_state(hf, dfg.ui.site_id, region_pos)
+            change_state(hf, dfg.plotinfo.site_id, region_pos)
             -- leave info nil if not found for now
         end
 
@@ -288,11 +288,11 @@ end
 function make_own(unit)
     --tweak makeown
     unit.flags2.resident = false; unit.flags1.merchant = false; unit.flags1.forest = false;
-    unit.civ_id = df.global.ui.civ_id
+    unit.civ_id = df.global.plotinfo.civ_id
     if unit.profession == df.profession.MERCHANT then unit.profession = df.profession.TRADER end
     if unit.profession2 == df.profession.MERCHANT then unit.profession2 = df.profession.TRADER end
     fix_clothing_ownership(unit)
-    if unit.race == df.global.ui.race_id then
+    if unit.race == df.global.plotinfo.race_id then
         make_citizen(unit)
     end
 end

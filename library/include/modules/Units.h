@@ -43,7 +43,6 @@ namespace df
 {
     struct nemesis_record;
     struct burrow;
-    struct identity;
     struct historical_entity;
     struct entity_position_assignment;
     struct entity_position;
@@ -215,18 +214,13 @@ DFHACK_EXPORT df::item *getContainer(df::unit *unit);
 DFHACK_EXPORT void setNickname(df::unit *unit, std::string nick);
 DFHACK_EXPORT df::language_name *getVisibleName(df::unit *unit);
 
-DFHACK_EXPORT df::identity *getIdentity(df::unit *unit);
 DFHACK_EXPORT df::nemesis_record *getNemesis(df::unit *unit);
 
-DFHACK_EXPORT bool isHidingCurse(df::unit *unit);
 DFHACK_EXPORT int getPhysicalAttrValue(df::unit *unit, df::physical_attribute_type attr);
 DFHACK_EXPORT int getMentalAttrValue(df::unit *unit, df::mental_attribute_type attr);
 DFHACK_EXPORT bool casteFlagSet(int race, int caste, df::caste_raw_flags flag);
 
-DFHACK_EXPORT bool isCrazed(df::unit *unit);
-DFHACK_EXPORT bool isOpposedToLife(df::unit *unit);
 DFHACK_EXPORT bool hasExtravision(df::unit *unit);
-DFHACK_EXPORT bool isBloodsucker(df::unit *unit);
 DFHACK_EXPORT bool isMischievous(df::unit *unit);
 
 DFHACK_EXPORT df::unit_misc_trait *getMiscTrait(df::unit *unit, df::misc_trait_type type, bool create = false);
@@ -268,10 +262,8 @@ DFHACK_EXPORT bool isForest(df::unit* unit);
 DFHACK_EXPORT bool isMarkedForSlaughter(df::unit* unit);
 DFHACK_EXPORT bool isTame(df::unit* unit);
 DFHACK_EXPORT bool isTrained(df::unit* unit);
-DFHACK_EXPORT bool isGay(df::unit* unit);
 DFHACK_EXPORT bool isNaked(df::unit* unit);
 DFHACK_EXPORT bool isUndead(df::unit* unit);
-DFHACK_EXPORT bool isGelded(df::unit* unit);
 DFHACK_EXPORT bool isDomesticated(df::unit* unit);
 
 DFHACK_EXPORT double getAge(df::unit *unit, bool true_age = false);

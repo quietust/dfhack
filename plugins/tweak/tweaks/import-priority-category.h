@@ -15,7 +15,7 @@ struct takerequest_hook : df::viewscreen_topicmeeting_takerequestsst {
         {
             int delta = 0 + input->count(interface_key::CURSOR_RIGHT_FAST)
                           - input->count(interface_key::CURSOR_LEFT_FAST);
-            vector<int8_t> &cur_priorities = meeting->sell_requests->priority[type_categories[type_idx]];
+            vector<int8_t> &cur_priorities = meeting->sell_requests->priority[visible_categories[type_idx]];
             for (size_t i = 0; i < cur_priorities.size(); i++)
             {
                 cur_priorities[i] += delta;

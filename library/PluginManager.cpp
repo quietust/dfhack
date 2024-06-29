@@ -287,11 +287,8 @@ bool Plugin::load(color_ostream &con)
         return false;
     }
     const char ** plug_version =(const char ** ) LookupPlugin(plug, "plugin_version");
-    const char ** plug_git_desc_ptr = (const char**) LookupPlugin(plug, "plugin_git_description");
     Plugin **plug_self = (Plugin**)LookupPlugin(plug, "plugin_self");
     const char *dfhack_version = Version::dfhack_version();
-    const char *dfhack_git_desc = Version::git_description();
-    const char *plug_git_desc = plug_git_desc_ptr ? *plug_git_desc_ptr : "unknown";
     if (strcmp(dfhack_version, *plug_version) != 0)
     {
         con.printerr("Plugin %s was not built for this version of DFHack.\n"
@@ -299,14 +296,6 @@ bool Plugin::load(color_ostream &con)
         plugin_abort_load;
         return false;
     }
-    if (plug_git_desc_ptr)
-    {
-        if (strcmp(dfhack_git_desc, plug_git_desc) != 0)
-            con.printerr("Warning: Plugin %s compiled for DFHack %s, running DFHack %s\n",
-                *plug_name, plug_git_desc, dfhack_git_desc);
-    }
-    else
-        con.printerr("Warning: Plugin %s missing git information\n", *plug_name);
     bool *plug_dev = (bool*)LookupPlugin(plug, "plugin_dev");
     if (plug_dev && *plug_dev && getenv("DFHACK_NO_DEV_PLUGINS"))
     {
@@ -351,7 +340,7 @@ bool Plugin::load(color_ostream &con)
         parent->registerCommands(this);
         if ((plugin_onupdate || plugin_enable) && !plugin_is_enabled)
             con.printerr("Plugin %s has no enabled var!\n", name.c_str());
-        fprintf(stderr, "loaded plugin %s; DFHack build %s\n", name.c_str(), plug_git_desc);
+        fprintf(stderr, "loaded plugin %s\n", name.c_str());
         fflush(stderr);
         return true;
     }

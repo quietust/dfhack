@@ -59,8 +59,8 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "LuaTools.h"
 
 #include "DataDefs.h"
-#include "df/ui.h"
-#include "df/ui_advmode.h"
+#include "df/plotinfost.h"
+#include "df/adventurest.h"
 #include "df/world.h"
 #include "df/world_data.h"
 #include "df/unit.h"
@@ -77,7 +77,6 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "df/historical_entity.h"
 #include "df/squad.h"
 #include "df/squad_position.h"
-#include "df/incident.h"
 
 #include "BasicApi.pb.h"
 
@@ -281,13 +280,6 @@ void DFHack::describeUnit(BasicUnitInfo *info, df::unit *unit,
     if (unit->hist_figure_id >= 0)
         info->set_histfig_id(unit->hist_figure_id);
 
-    if (unit->counters.death_id >= 0)
-    {
-        info->set_death_id(unit->counters.death_id);
-        if (auto death = df::incident::find(unit->counters.death_id))
-            info->set_death_flags(death->flags.whole);
-    }
-
     if (mask && mask->profession())
     {
         if (unit->profession >= (df::profession)0)
@@ -336,24 +328,6 @@ void DFHack::describeUnit(BasicUnitInfo *info, df::unit *unit,
         }
     }
 
-    if (unit->curse.add_tags1.whole ||
-        unit->curse.add_tags2.whole ||
-        unit->curse.rem_tags1.whole ||
-        unit->curse.rem_tags2.whole ||
-        unit->curse.name_visible)
-    {
-        auto curse = info->mutable_curse();
-
-        curse->set_add_tags1(unit->curse.add_tags1.whole);
-        curse->set_rem_tags1(unit->curse.rem_tags1.whole);
-        curse->set_add_tags2(unit->curse.add_tags2.whole);
-        curse->set_rem_tags2(unit->curse.rem_tags2.whole);
-
-        if (unit->curse.name_visible)
-            describeNameTriple(curse->mutable_name(), unit->curse.name,
-                               unit->curse.name_plural, unit->curse.name_adjective);
-    }
-
     for (size_t i = 0; i < unit->burrows.size(); i++)
         info->add_burrows(unit->burrows[i]);
 }
@@ -375,11 +349,11 @@ static command_result GetDFVersion(color_ostream &stream,
 static command_result GetWorldInfo(color_ostream &stream,
                                    const EmptyMessage *, GetWorldInfoOut *out)
 {
-    using df::global::ui;
-    using df::global::ui_advmode;
+    using df::global::plotinfo;
+    using df::global::adventure;
     using df::global::world;
 
-    if (!ui || !world || !Core::getInstance().isWorldLoaded())
+    if (!plotinfo || !world || !Core::getInstance().isWorldLoaded())
         return CR_NOT_FOUND;
 
     df::game_type gt = game_type::DWARF_MAIN;
@@ -396,33 +370,27 @@ static command_result GetWorldInfo(color_ostream &stream,
     case game_type::DWARF_MAIN:
     case game_type::DWARF_RECLAIM:
         out->set_mode(GetWorldInfoOut::MODE_DWARF);
-        out->set_civ_id(ui->civ_id);
-        out->set_site_id(ui->site_id);
-        out->set_group_id(ui->group_id);
-        out->set_race_id(ui->race_id);
+        out->set_civ_id(plotinfo->civ_id);
+        out->set_site_id(plotinfo->site_id);
+        out->set_group_id(plotinfo->group_id);
+        out->set_race_id(plotinfo->race_id);
         break;
 
     case game_type::ADVENTURE_MAIN:
         out->set_mode(GetWorldInfoOut::MODE_ADVENTURE);
 
         if (auto unit = vector_get(world->units.active, 0))
+        {
             out->set_player_unit_id(unit->id);
 
-        if (!ui_advmode)
-            break;
+            if (unit->hist_figure_id != -1)
+                out->set_player_histfig_id(unit->hist_figure_id);
 
-        if (auto nemesis = vector_get(world->nemesis.all, ui_advmode->player_id))
-        {
-            if (nemesis->figure)
-                out->set_player_histfig_id(nemesis->figure->id);
+            if (!adventure)
+                break;
 
-            for (size_t i = 0; i < nemesis->companions.size(); i++)
-            {
-                auto unm = df::nemesis_record::find(nemesis->companions[i]);
-                if (!unm || !unm->figure)
-                    continue;
-                out->add_companion_histfig_ids(unm->figure->id);
-            }
+            for (size_t i = 0; i < adventure->companion_hf.size(); i++)
+                out->add_companion_histfig_ids(adventure->companion_hf[i]);
         }
         break;
 
@@ -452,11 +420,6 @@ static command_result ListEnums(color_ostream &stream,
 
     ENUM(unit_labor);
     ENUM(job_skill);
-
-    BITFIELD(cie_add_tag_mask1);
-    BITFIELD(cie_add_tag_mask2);
-
-    describe_bitfield<df::incident::T_flags>(out->mutable_death_info_flags());
 
     ENUM(profession);
 
@@ -609,7 +572,7 @@ static command_result ListUnits(color_ostream &stream,
 static command_result ListSquads(color_ostream &stream,
                                  const ListSquadsIn *in, ListSquadsOut *out)
 {
-    auto entity = df::historical_entity::find(df::global::ui->group_id);
+    auto entity = df::historical_entity::find(df::global::plotinfo->group_id);
     if (!entity)
         return CR_NOT_FOUND;
 

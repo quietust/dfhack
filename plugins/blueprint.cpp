@@ -15,7 +15,6 @@
 #include "df/building_bridgest.h"
 #include "df/building_constructionst.h"
 #include "df/building_furnacest.h"
-#include "df/building_rollersst.h"
 #include "df/building_screw_pumpst.h"
 #include "df/building_siegeenginest.h"
 #include "df/building_trapst.h"
@@ -275,66 +274,6 @@ string get_tile_build(uint32_t x, uint32_t y, df::building* b)
             return "Cx";
         case construction_type::Ramp:
             return "Cr";
-        case construction_type::TrackN:
-            return "trackN";
-        case construction_type::TrackS:
-            return "trackS";
-        case construction_type::TrackE:
-            return "trackE";
-        case construction_type::TrackW:
-            return "trackW";
-        case construction_type::TrackNS:
-            return "trackNS";
-        case construction_type::TrackNE:
-            return "trackNE";
-        case construction_type::TrackNW:
-            return "trackNW";
-        case construction_type::TrackSE:
-            return "trackSE";
-        case construction_type::TrackSW:
-            return "trackSW";
-        case construction_type::TrackEW:
-            return "trackEW";
-        case construction_type::TrackNSE:
-            return "trackNSE";
-        case construction_type::TrackNSW:
-            return "trackNSW";
-        case construction_type::TrackNEW:
-            return "trackNEW";
-        case construction_type::TrackSEW:
-            return "trackSEW";
-        case construction_type::TrackNSEW:
-            return "trackNSEW";
-        case construction_type::TrackRampN:
-            return "trackrampN";
-        case construction_type::TrackRampS:
-            return "trackrampS";
-        case construction_type::TrackRampE:
-            return "trackrampE";
-        case construction_type::TrackRampW:
-            return "trackrampW";
-        case construction_type::TrackRampNS:
-            return "trackrampNS";
-        case construction_type::TrackRampNE:
-            return "trackrampNE";
-        case construction_type::TrackRampNW:
-            return "trackrampNW";
-        case construction_type::TrackRampSE:
-            return "trackrampSE";
-        case construction_type::TrackRampSW:
-            return "trackrampSW";
-        case construction_type::TrackRampEW:
-            return "trackrampEW";
-        case construction_type::TrackRampNSE:
-            return "trackrampNSE";
-        case construction_type::TrackRampNSW:
-            return "trackrampNSW";
-        case construction_type::TrackRampNEW:
-            return "trackrampNEW";
-        case construction_type::TrackRampSEW:
-            return "trackrampSEW";
-        case construction_type::TrackRampNSEW:
-            return "trackrampNSEW";
         }
     case building_type::Shop:
         if (! at_center)
@@ -363,38 +302,6 @@ string get_tile_build(uint32_t x, uint32_t y, df::building* b)
             return "Tp";
         case trap_type::CageTrap:
             return "Tc";
-        case trap_type::TrackStop:
-            df::building_trapst* ts = (df::building_trapst*) b;
-            out << "CS";
-            if (ts->use_dump)
-            {
-                if (ts->dump_x_shift == 0)
-                {
-                    if (ts->dump_y_shift > 0)
-                        out << "dd";
-                    else
-                        out << "d";
-                }
-                else
-                {
-                    if (ts->dump_x_shift > 0)
-                        out << "ddd";
-                    else
-                        out << "dddd";
-                }
-            }
-            switch (ts->friction)
-            {
-            case 10:
-                out << "a";
-            case 50:
-                out << "a";
-            case 500:
-                out << "a";
-            case 10000:
-                out << "a";
-            }
-            return out.str();
         }
     case building_type::ScrewPump:
         if (! at_se_corner) //screw pumps anchor at bottom/right
@@ -430,23 +337,6 @@ string get_tile_build(uint32_t x, uint32_t y, df::building* b)
         return out.str();
     case building_type::AxleVertical:
         return "Mv";
-    case building_type::Rollers:
-        if (! at_nw_corner)
-            return "`";
-        out << "Mr";
-        switch (((df::building_rollersst*) b)->direction)
-        {
-        case screw_pump_direction::FromNorth:
-            break;
-        case screw_pump_direction::FromEast:
-            out << "s";
-        case screw_pump_direction::FromSouth:
-            out << "s";
-        case screw_pump_direction::FromWest:
-            out << "s";
-        }
-        out << "(" << size.first << "x" << size.second << ")";
-        return out.str();
     case building_type::Support:
         return "S";
     case building_type::ArcheryTarget:

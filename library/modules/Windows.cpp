@@ -28,9 +28,7 @@ distribution.
 #include <string>
 
 #include "DataDefs.h"
-#include "df/init.h"
-#include "df/ui.h"
-#include <df/graphic.h>
+#include <df/graphicst.h>
 #include "modules/Windows.h"
 
 using namespace DFHack;

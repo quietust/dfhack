@@ -13,8 +13,8 @@
 #include "modules/Screen.h"
 
 #include <VTableInterpose.h>
-#include "df/ui.h"
-#include "df/ui_sidebar_menus.h"
+#include "df/plotinfost.h"
+#include "df/gamest.h"
 #include "df/world.h"
 #include "df/squad.h"
 #include "df/unit.h"
@@ -22,7 +22,6 @@
 #include "df/historical_entity.h"
 #include "df/historical_figure.h"
 #include "df/historical_figure_info.h"
-#include "df/identity.h"
 #include "df/language_name.h"
 #include "df/building_stockpilest.h"
 #include "df/building_workshopst.h"
@@ -49,8 +48,8 @@ using namespace dfproto;
 DFHACK_PLUGIN("rename");
 DFHACK_PLUGIN_IS_ENABLED(is_enabled);
 
-REQUIRE_GLOBAL(ui);
-REQUIRE_GLOBAL(ui_sidebar_menus);
+REQUIRE_GLOBAL(plotinfo);
+REQUIRE_GLOBAL(game);
 REQUIRE_GLOBAL(world);
 
 DFhackCExport command_result plugin_onstatechange(color_ostream &out, state_change_event event);
@@ -59,7 +58,7 @@ static command_result rename(color_ostream &out, vector <string> & parameters);
 
 DFhackCExport command_result plugin_init (color_ostream &out, std::vector <PluginCommand> &commands)
 {
-    if (world && ui) {
+    if (world && plotinfo) {
         commands.push_back(PluginCommand(
             "rename", "Rename various things.", rename, false,
             "  rename squad <index> \"name\"\n"
@@ -142,9 +141,9 @@ struct dwarf_render_zone_hook : df::viewscreen_dwarfmodest {
     {
         INTERPOSE_NEXT(render)();
 
-        if (ui->main.mode == ui_sidebar_mode::Zones &&
-            ui_sidebar_menus && ui_sidebar_menus->zone.selected &&
-            !ui_sidebar_menus->zone.selected->name.empty())
+        if (plotinfo->main.mode == ui_sidebar_mode::Zones &&
+            game && game->zone.selected &&
+            !game->zone.selected->name.empty())
         {
             auto dims = Gui::getDwarfmodeViewDims();
             int width = dims.menu_x2 - dims.menu_x1 - 1;
@@ -153,7 +152,7 @@ struct dwarf_render_zone_hook : df::viewscreen_dwarfmodest {
             Screen::fillRect(pen, dims.menu_x1, dims.y1+1, dims.menu_x2, dims.y1+1);
 
             std::string name;
-            ui_sidebar_menus->zone.selected->getName(&name);
+            game->zone.selected->getName(&name);
             Screen::paintString(pen, dims.menu_x1+1, dims.y1+1, name.substr(0, width));
         }
     }
@@ -265,7 +264,7 @@ static bool renameBuilding(df::building *bld, std::string name)
 
 static df::squad *getSquadByIndex(unsigned idx)
 {
-    auto entity = df::historical_entity::find(ui->group_id);
+    auto entity = df::historical_entity::find(plotinfo->group_id);
     if (!entity)
         return NULL;
 
@@ -368,7 +367,7 @@ static command_result rename(color_ostream &out, vector <string> &parameters)
             return CR_WRONG_USAGE;
         }
 
-        ui->main.hotkeys[id-1].name = parameters[2];
+        plotinfo->main.hotkeys[id-1].name = parameters[2];
     }
     else if (cmd == "unit")
     {

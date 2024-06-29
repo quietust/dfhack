@@ -43,7 +43,7 @@ command_result df_showmood (color_ostream &out, vector <string> & parameters)
     CoreSuspender suspend;
 
     bool found = false;
-    for (df::job_list_link *cur = world->job_list.next; cur != NULL; cur = cur->next)
+    for (df::job_list_link *cur = world->jobs.list.next; cur != NULL; cur = cur->next)
     {
         df::job *job = cur->item;
         if ((job->job_type < job_type::StrangeMoodCrafter) || (job->job_type > job_type::StrangeMoodMechanics))
@@ -168,9 +168,9 @@ command_result df_showmood (color_ostream &out, vector <string> & parameters)
             out.print("not yet claimed a workshop but will want");
         out.print(" the following items:\n");
 
-        for (size_t i = 0; i < job->job_items.size(); i++)
+        for (size_t i = 0; i < job->job_items.elements.size(); i++)
         {
-            df::job_item *item = job->job_items[i];
+            df::job_item *item = job->job_items.elements[i];
             out.print("Item %i: ", i + 1);
 
             MaterialInfo matinfo(item->mat_type, item->mat_index);

@@ -15,7 +15,7 @@
 #include <string.h>
 
 #include <VTableInterpose.h>
-#include "df/graphic.h"
+#include "df/graphicst.h"
 #include "df/building_workshopst.h"
 #include "df/building_def_workshopst.h"
 #include "df/item_liquid_miscst.h"
@@ -27,9 +27,9 @@
 #include "df/machine.h"
 #include "df/job.h"
 #include "df/building_drawbuffer.h"
-#include "df/ui.h"
+#include "df/plotinfost.h"
 #include "df/viewscreen_dwarfmodest.h"
-#include "df/ui_build_selector.h"
+#include "df/buildreq.h"
 #include "df/flow_info.h"
 #include "df/report.h"
 
@@ -122,8 +122,8 @@ DFHACK_PLUGIN("steam-engine");
 
 REQUIRE_GLOBAL(gps);
 REQUIRE_GLOBAL(world);
-REQUIRE_GLOBAL(ui);
-REQUIRE_GLOBAL(ui_build_selector);
+REQUIRE_GLOBAL(plotinfo);
+REQUIRE_GLOBAL(buildreq);
 REQUIRE_GLOBAL(cursor);
 
 /*
@@ -249,7 +249,7 @@ struct liquid_hook : df::item_liquid_miscst {
 
     DEFINE_VMETHOD_INTERPOSE(void, getItemDescription, (std::string *buf, int8_t mode))
     {
-        if (mat_state.whole & BOILING_FLAG)
+        if (liquid_misc_flags.whole & BOILING_FLAG)
             buf->append("boiling ");
 
         INTERPOSE_NEXT(getItemDescription)(buf, mode);
@@ -257,7 +257,7 @@ struct liquid_hook : df::item_liquid_miscst {
 
     DEFINE_VMETHOD_INTERPOSE(bool, adjustTemperature, (uint16_t temp, int32_t unk))
     {
-        if (mat_state.whole & BOILING_FLAG)
+        if (liquid_misc_flags.whole & BOILING_FLAG)
             temp = std::max(int(temp), getBoilingPoint()-1);
 
         return INTERPOSE_NEXT(adjustTemperature)(temp, unk);
@@ -265,7 +265,7 @@ struct liquid_hook : df::item_liquid_miscst {
 
     DEFINE_VMETHOD_INTERPOSE(bool, checkTemperatureDamage, ())
     {
-        if (mat_state.whole & BOILING_FLAG)
+        if (liquid_misc_flags.whole & BOILING_FLAG)
             temperature.whole = std::max(int(temperature.whole), getBoilingPoint()-1);
 
         return INTERPOSE_NEXT(checkTemperatureDamage)();
@@ -373,7 +373,7 @@ struct workshop_hook : df::building_workshopst {
 
         // Update flags
         liquid->flags.bits.in_building = true;
-        liquid->mat_state.whole |= liquid_hook::BOILING_FLAG;
+        liquid->liquid_misc_flags.whole |= liquid_hook::BOILING_FLAG;
         liquid->temperature.whole = liquid->getBoilingPoint()-1;
         liquid->temperature.fraction = 0;
 
@@ -822,12 +822,12 @@ struct dwarfmode_hook : df::viewscreen_dwarfmodest
 
     steam_engine_workshop *get_steam_engine()
     {
-        if (ui->main.mode == ui_sidebar_mode::Build &&
-            ui_build_selector->stage == 1 &&
-            ui_build_selector->building_type == building_type::Workshop &&
-            ui_build_selector->building_subtype == workshop_type::Custom)
+        if (plotinfo->main.mode == ui_sidebar_mode::Build &&
+            buildreq->stage == df::buildreq::T_stage::PLACING &&
+            buildreq->building_type == building_type::Workshop &&
+            buildreq->building_subtype == workshop_type::Custom)
         {
-            return find_steam_engine(ui_build_selector->custom_type);
+            return find_steam_engine(buildreq->custom_type);
         }
 
         return NULL;
@@ -846,14 +846,14 @@ struct dwarfmode_hook : df::viewscreen_dwarfmodest
         {
             for (int y = 0; y < engine->def->dim_y; y++)
             {
-                if (ui_build_selector->tiles[x][y] >= 5)
+                if (buildreq->tiles[x][y] >= build_square_type::BAD_ANCHOR)
                     continue;
 
                 auto ptile = Maps::getTileType(x1+x,y1+y,cursor->z);
                 if (ptile && !isOpenTerrain(*ptile))
                     continue;
 
-                ui_build_selector->tiles[x][y] = 6;
+                buildreq->tiles[x][y] = build_square_type::BAD_ANCHOR;
                 error = true;
             }
         }
@@ -861,7 +861,7 @@ struct dwarfmode_hook : df::viewscreen_dwarfmodest
         if (error)
         {
             const char *msg = "Hanging - cover channels with down stairs.";
-            ui_build_selector->errors.push_back(new std::string(msg));
+            buildreq->errors.push_back(new std::string(msg));
         }
     }
 

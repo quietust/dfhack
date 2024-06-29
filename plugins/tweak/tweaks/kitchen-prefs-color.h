@@ -43,7 +43,7 @@ struct kitchen_prefs_color_hook : df::viewscreen_kitchenprefst {
            Detecting light blue "Cook" and "Brew" strings should be sufficient,
            but reverse-engineering the algorithm could be slightly faster. */
 
-        if (!item_type[page].size())
+        if (!item_type.size())
            return;
 
         int start_x = 0,

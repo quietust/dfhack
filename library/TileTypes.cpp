@@ -101,11 +101,6 @@ static df::tiletype find_match(
 
         switch (special)
         {
-            case TRACK:
-                if (sp_map.count(SMOOTH)) {
-                    special = SMOOTH; break;
-                }
-
             case df::enums::tiletype_special::NONE:
             case NORMAL:
             case SMOOTH:
@@ -190,7 +185,9 @@ static void init_tables()
 
         if (isCoreMaterial(attrs.material))
         {
+            #ifdef assert
             assert(attrs.material < NUM_CVTABLES);
+            #endif
             tile_to_mat[attrs.material][tt] = tt;
         }
     }

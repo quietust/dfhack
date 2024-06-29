@@ -27,7 +27,7 @@
 #include "modules/Maps.h"
 #include "modules/Units.h"
 #include "df/building_cagest.h"
-#include "df/ui_advmode.h"
+#include "df/adventurest.h"
 
 DFHACK_PLUGIN("stocks");
 #define PLUGIN_VERSION 0.12
@@ -273,8 +273,8 @@ static map<df::item *, bool> items_in_cages;
 static df::job *get_item_job(df::item *item)
 {
     auto ref = Items::getSpecificRef(item, specific_ref_type::JOB);
-    if (ref && ref->job)
-        return ref->job;
+    if (ref && ref->data.job)
+        return ref->data.job;
 
     return nullptr;
 }
@@ -1091,12 +1091,12 @@ private:
             if (item->flags.bits.in_job)
             {
                 auto ref = Items::getSpecificRef(item, specific_ref_type::JOB);
-                if (ref && ref->job)
+                if (ref && ref->data.job)
                 {
-                    if (ref->job->job_type == job_type::Eat || ref->job->job_type == job_type::Drink)
+                    if (ref->data.job->job_type == job_type::Eat || ref->data.job->job_type == job_type::Drink)
                         return pos;
 
-                    auto unit = Job::getWorker(ref->job);
+                    auto unit = Job::getWorker(ref->data.job);
                     if (unit)
                         return unit->pos;
                 }
@@ -1484,10 +1484,7 @@ struct stocks_stockpile_hook : public df::viewscreen_dwarfmodest
         int y = dims.y2 - 4;
 
         int links = 0;
-        links += sp->links.give_to_pile.size();
-        links += sp->links.take_from_pile.size();
-        links += sp->links.give_to_workshop.size();
-        links += sp->links.take_from_workshop.size();
+        links += sp->take_from.size();
         if (links + 12 >= y)
            y = 3;
 

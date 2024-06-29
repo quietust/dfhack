@@ -604,8 +604,8 @@ command_result df_liquids_execute(color_ostream &out, OperationMode &cur_mode, d
                 case M_DEC:
                     if (auto block = (*biter)->getRaw())
                     {
-                        block->flags.bits.update_liquid = false;
-                        block->flags.bits.update_liquid_twice = false;
+                        block->flags.clear(block_flags::UpdateLiquid);
+                        block->flags.clear(block_flags::UpdateLiquidTwice);
                     }
                     break;
                 case M_KEEP:

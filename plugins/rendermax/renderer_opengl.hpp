@@ -12,7 +12,7 @@
 #include "df/enabler.h"
 #include "df/zoom_commands.h"
 #include "df/texture_handler.h"
-#include "df/graphic.h"
+#include "df/graphicst.h"
 #include <math.h>
 #include <cmath>
 

@@ -255,7 +255,7 @@ local function dwarfmode_to_top()
     end
 
     for i=0,10 do
-        if is_known 'ui' and df.global.ui.main.mode == df.ui_sidebar_mode.Default then
+        if is_known 'ui' and df.global.plotinfo.main.mode == df.ui_sidebar_mode.Default then
             break
         end
         gui.simulateInput(screen, 'LEAVESCREEN')
@@ -663,7 +663,7 @@ local function is_valid_ui(ui)
     end
 
     if ui.follow_item ~= -1 or ui.follow_unit ~= -1 then
-        print('Invalid follow state: '..ui.follow_item..', '..ui.follow_unit)
+        print('Invalid follow state: '..plotinfo.follow_item..', '..plotinfo.follow_unit)
         return false
     end
 

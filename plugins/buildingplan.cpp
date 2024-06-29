@@ -2,8 +2,8 @@
 
 DFHACK_PLUGIN("buildingplan");
 #define PLUGIN_VERSION 0.14
-REQUIRE_GLOBAL(ui);
-REQUIRE_GLOBAL(ui_build_selector);
+REQUIRE_GLOBAL(plotinfo);
+REQUIRE_GLOBAL(buildreq);
 REQUIRE_GLOBAL(world);
 
 DFhackCExport command_result plugin_shutdown ( color_ostream &out )
@@ -51,23 +51,23 @@ struct buildingplan_hook : public df::viewscreen_dwarfmodest
 
     bool isInPlannedBuildingQueryMode()
     {
-        return (ui->main.mode == df::ui_sidebar_mode::QueryBuilding ||
-            ui->main.mode == df::ui_sidebar_mode::BuildingItems) &&
+        return (plotinfo->main.mode == df::ui_sidebar_mode::QueryBuilding ||
+            plotinfo->main.mode == df::ui_sidebar_mode::BuildingItems) &&
             planner.getSelectedPlannedBuilding();
     }
 
     bool isInPlannedBuildingPlacementMode()
     {
-        return ui->main.mode == ui_sidebar_mode::Build &&
-            ui_build_selector &&
-            ui_build_selector->stage < 2 &&
-            planner.isPlanableBuilding(ui_build_selector->building_type);
+        return plotinfo->main.mode == ui_sidebar_mode::Build &&
+            buildreq &&
+            buildreq->stage != df::buildreq::T_stage::STAGES &&
+            planner.isPlanableBuilding(buildreq->building_type);
     }
 
     std::vector<Units::NoblePosition> getNoblePositionOfSelectedBuildingOwner()
     {
         std::vector<Units::NoblePosition> np;
-        if (ui->main.mode != df::ui_sidebar_mode::QueryBuilding ||
+        if (plotinfo->main.mode != df::ui_sidebar_mode::QueryBuilding ||
             !world->selected_building ||
             !world->selected_building->owner)
         {
@@ -99,7 +99,7 @@ struct buildingplan_hook : public df::viewscreen_dwarfmodest
     {
         if (isInPlannedBuildingPlacementMode())
         {
-            auto type = ui_build_selector->building_type;
+            auto type = buildreq->building_type;
             if (input->count(interface_key::CUSTOM_SHIFT_P))
             {
                 planmode_enabled[type] = !planmode_enabled[type];
@@ -136,7 +136,7 @@ struct buildingplan_hook : public df::viewscreen_dwarfmodest
 
                 if (input->count(interface_key::SELECT))
                 {
-                    if (ui_build_selector->errors.size() == 0 && planner.allocatePlannedBuilding(type))
+                    if (buildreq->errors.size() == 0 && planner.allocatePlannedBuilding(type))
                     {
                         send_key(interface_key::CURSOR_DOWN_Z);
                         send_key(interface_key::CURSOR_UP_Z);
@@ -212,21 +212,21 @@ struct buildingplan_hook : public df::viewscreen_dwarfmodest
     DEFINE_VMETHOD_INTERPOSE(void, render, ())
     {
         bool plannable = isInPlannedBuildingPlacementMode();
-        if (plannable && is_planmode_enabled(ui_build_selector->building_type))
+        if (plannable && is_planmode_enabled(buildreq->building_type))
         {
-            if (ui_build_selector->stage < 1)
+            if (buildreq->stage == df::buildreq::T_stage::INITIAL_FAILURE)
             {
                 // No materials but turn on cursor
-                ui_build_selector->stage = 1;
+                buildreq->stage = df::buildreq::T_stage::PLACING;
             }
 
-            for (auto iter = ui_build_selector->errors.begin(); iter != ui_build_selector->errors.end();)
+            for (auto iter = buildreq->errors.begin(); iter != buildreq->errors.end();)
             {
                 //FIXME Hide bags
                 if (((*iter)->find("Needs") != string::npos && **iter != "Needs adjacent wall")  ||
                     (*iter)->find("No access") != string::npos)
                 {
-                    iter = ui_build_selector->errors.erase(iter);
+                    iter = buildreq->errors.erase(iter);
                 }
                 else
                 {
@@ -240,7 +240,7 @@ struct buildingplan_hook : public df::viewscreen_dwarfmodest
         auto dims = Gui::getDwarfmodeViewDims();
         int left_margin = dims.menu_x1 + 1;
         int x = left_margin;
-        auto type = ui_build_selector->building_type;
+        auto type = buildreq->building_type;
         if (plannable)
         {
             if (planner.inQuickFortMode() && planner.in_dummmy_screen)

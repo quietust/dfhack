@@ -58,11 +58,11 @@ using namespace std;
 #include "df/world_region_details.h"
 #include "df/builtin_mats.h"
 #include "df/block_square_event_grassst.h"
-#include "df/z_level_flags.h"
 #include "df/region_map_entry.h"
 #include "df/flow_info.h"
 #include "df/building_type.h"
 #include "df/plant.h"
+#include "df/block_flags.h"
 
 using namespace DFHack;
 using namespace df::enums;
@@ -90,7 +90,7 @@ const char * DFHack::sa_feature(df::feature_type index)
         return "Cavern";
     case feature_type::magma_core_from_layer:
         return "Magma sea";
-    case feature_type::feature_underworld_from_layer:
+    case feature_type::underworld_from_layer:
         return "Underworld";
     default:
         return "Unknown/Error";
@@ -245,22 +245,12 @@ void Maps::enableBlockUpdates(df::map_block *blk, bool flow, bool temperature)
     if (!blk || !(flow || temperature)) return;
 
     if (temperature)
-        blk->flags.bits.update_temperature = true;
+        blk->flags.set(df::block_flags::UpdateTemperature);
 
     if (flow)
     {
-        blk->flags.bits.update_liquid = true;
-        blk->flags.bits.update_liquid_twice = true;
-    }
-
-    auto z_flags = world->map_extras.z_level_flags;
-    int z_level = blk->map_pos.z;
-
-    if (z_flags && z_level >= 0 && z_level < world->map.z_count_block)
-    {
-        z_flags += z_level;
-        z_flags->bits.update = true;
-        z_flags->bits.update_twice = true;
+        blk->flags.set(df::block_flags::UpdateLiquid);
+        blk->flags.set(df::block_flags::UpdateLiquidTwice);
     }
 }
 
@@ -388,9 +378,7 @@ bool Maps::SortBlockEvents(df::map_block *block,
     vector <df::block_square_event_frozen_liquidst *>* ices,
     vector <df::block_square_event_material_spatterst *> *materials,
     vector <df::block_square_event_grassst *> *grasses,
-    vector <df::block_square_event_world_constructionst *> *constructions,
-    vector <df::block_square_event_spoorst *> *spoors,
-    vector <df::block_square_event_item_spatterst *> *items)
+    vector <df::block_square_event_world_constructionst *> *constructions)
 {
     if (veins)
         veins->clear();
@@ -402,10 +390,6 @@ bool Maps::SortBlockEvents(df::map_block *block,
         materials->clear();
     if (grasses)
         grasses->clear();
-    if (spoors)
-        spoors->clear();
-    if (items)
-        items->clear();
 
     if (!block)
         return false;
@@ -435,14 +419,6 @@ bool Maps::SortBlockEvents(df::map_block *block,
         case block_square_event_type::grass:
             if (grasses)
                 grasses->push_back((df::block_square_event_grassst *)evt);
-            break;
-        case block_square_event_type::spoor:
-            if (spoors)
-                spoors->push_back((df::block_square_event_spoorst *)evt);
-            break;
-        case block_square_event_type::item_spatter:
-            if (items)
-                items->push_back((df::block_square_event_item_spatterst *)evt);
             break;
         }
     }

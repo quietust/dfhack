@@ -21,7 +21,7 @@
 #include "DataDefs.h"
 #include <VTableInterpose.h>
 #include "../uicommon.h"
-#include "df/ui.h"
+#include "df/plotinfost.h"
 #include "df/world.h"
 #include "df/squad.h"
 #include "df/unit.h"
@@ -29,17 +29,14 @@
 #include "df/historical_entity.h"
 #include "df/historical_figure.h"
 #include "df/historical_figure_info.h"
-#include "df/identity.h"
 #include "df/language_name.h"
-#include "df/incident.h"
-#include "df/crime.h"
 #include "df/unit_inventory_item.h"
 #include "df/viewscreen_dwarfmodest.h"
 #include "df/viewscreen_kitchenprefst.h"
 #include "df/viewscreen_layer_unit_actionst.h"
 #include "df/squad_order_trainst.h"
-#include "df/ui_build_selector.h"
-#include "df/ui_sidebar_menus.h"
+#include "df/buildreq.h"
+#include "df/gamest.h"
 #include "df/building_trapst.h"
 #include "df/building_workshopst.h"
 #include "df/item_actual.h"
@@ -54,6 +51,7 @@
 #include "df/item_barst.h"
 #include "df/item_threadst.h"
 #include "df/item_clothst.h"
+#include "df/region_headerst.h"
 #include "df/spatter.h"
 #include "df/layer_object.h"
 #include "df/reaction.h"
@@ -84,16 +82,12 @@
 #include "tweaks/craft-age-wear.h"
 #include "tweaks/eggs-fertile.h"
 #include "tweaks/embark-profile-name.h"
-#include "tweaks/farm-plot-select.h"
 #include "tweaks/fast-heat.h"
 #include "tweaks/fast-trade.h"
 #include "tweaks/fps-min.h"
-#include "tweaks/hide-priority.h"
 #include "tweaks/import-priority-category.h"
 #include "tweaks/kitchen-keys.h"
 #include "tweaks/kitchen-prefs-color.h"
-#include "tweaks/kitchen-prefs-empty.h"
-#include "tweaks/max-wheelbarrow.h"
 #include "tweaks/military-assign.h"
 #include "tweaks/nestbox-color.h"
 #include "tweaks/shift-8-scroll.h"
@@ -112,13 +106,12 @@ DFHACK_PLUGIN("tweak");
 DFHACK_PLUGIN_IS_ENABLED(is_enabled);
 
 REQUIRE_GLOBAL(enabler);
-REQUIRE_GLOBAL(ui);
-REQUIRE_GLOBAL(ui_area_map_width);
-REQUIRE_GLOBAL(ui_build_selector);
+REQUIRE_GLOBAL(plotinfo);
+REQUIRE_GLOBAL(buildreq);
 REQUIRE_GLOBAL(ui_building_item_cursor);
 REQUIRE_GLOBAL(ui_menu_width);
 REQUIRE_GLOBAL(ui_look_cursor);
-REQUIRE_GLOBAL(ui_sidebar_menus);
+REQUIRE_GLOBAL(game);
 REQUIRE_GLOBAL(ui_unit_view_mode);
 REQUIRE_GLOBAL(ui_workshop_in_add);
 REQUIRE_GLOBAL(world);
@@ -148,8 +141,6 @@ DFhackCExport command_result plugin_init (color_ostream &out, std::vector <Plugi
     is_enabled = true; // Allow plugin_onupdate to work (subcommands are enabled individually)
     commands.push_back(PluginCommand(
         "tweak", "Various tweaks for minor bugs.", tweak, false,
-        "  tweak clear-missing\n"
-        "    Remove the missing status from the selected unit.\n"
         "  tweak clear-ghostly\n"
         "    Remove the ghostly status from the selected unit.\n"
         "    Intended to fix the case where you can't engrave memorials for ghosts.\n"
@@ -189,8 +180,6 @@ DFhackCExport command_result plugin_init (color_ostream &out, std::vector <Plugi
         "    Allows the use of lowercase letters when saving embark profiles\n"
         "  tweak eggs-fertile [disable]\n"
         "    Displays a fertile/infertile indicator on nestboxes\n"
-        "  tweak farm-plot-select [disable]\n"
-        "    Adds \"Select all\" and \"Deselect all\" options to farm plot menus\n"
         "  tweak fast-heat <max-ticks>\n"
         "    Further improves temperature updates by ensuring that 1 degree of\n"
         "    item temperature is crossed in no more than specified number of frames\n"
@@ -209,10 +198,6 @@ DFhackCExport command_result plugin_init (color_ostream &out, std::vector <Plugi
         "    Fixes DF kitchen meal keybindings (bug 614)\n"
         "  tweak kitchen-prefs-color [disable]\n"
         "    Changes color of enabled items to green in kitchen preferences\n"
-        "  tweak kitchen-prefs-empty [disable]\n"
-        "    Fixes a layout issue with empty kitchen tabs (bug 9000)\n"
-        "  tweak max-wheelbarrow [disable]\n"
-        "    Allows assigning more than 3 wheelbarrows to a stockpile\n"
         "  tweak nestbox-color [disable]\n"
         "    Makes built nestboxes use the color of their material\n"
         "  tweak military-color-assigned [disable]\n"
@@ -252,9 +237,6 @@ DFhackCExport command_result plugin_init (color_ostream &out, std::vector <Plugi
 
     TWEAK_HOOK("embark-profile-name", embark_profile_name_hook, feed);
 
-    TWEAK_HOOK("farm-plot-select", farm_select_hook, feed);
-    TWEAK_HOOK("farm-plot-select", farm_select_hook, render);
-
     TWEAK_HOOK("fast-heat", fast_heat_hook, updateTempFromMap);
     TWEAK_HOOK("fast-heat", fast_heat_hook, updateTemperature);
     TWEAK_HOOK("fast-heat", fast_heat_hook, adjustTemperature);
@@ -264,9 +246,6 @@ DFhackCExport command_result plugin_init (color_ostream &out, std::vector <Plugi
 
     TWEAK_ONUPDATE_HOOK("fps-min", fps_min_hook);
 
-    TWEAK_HOOK("hide-priority", hide_priority_hook, feed);
-    TWEAK_HOOK("hide-priority", hide_priority_hook, render);
-
     TWEAK_HOOK("import-priority-category", takerequest_hook, feed);
     TWEAK_HOOK("import-priority-category", takerequest_hook, render);
 
@@ -274,11 +253,6 @@ DFhackCExport command_result plugin_init (color_ostream &out, std::vector <Plugi
     TWEAK_HOOK("kitchen-keys", kitchen_keys_hook, render);
 
     TWEAK_HOOK("kitchen-prefs-color", kitchen_prefs_color_hook, render);
-
-    TWEAK_HOOK("kitchen-prefs-empty", kitchen_prefs_empty_hook, render);
-
-    TWEAK_HOOK("max-wheelbarrow", max_wheelbarrow_hook, render);
-    TWEAK_HOOK("max-wheelbarrow", max_wheelbarrow_hook, feed);
 
     TWEAK_HOOK("military-color-assigned", military_assign_hook, render);
 
@@ -357,7 +331,7 @@ command_result fix_clothing_ownership(color_ostream &out, df::unit* unit)
                 if(Items::setOwner(item, unit))
                 {
                     // add to uniform, so they know they should wear their clothes
-                    insert_into_vector(unit->military.uniforms[0], item->id);
+                    insert_into_vector(unit->uniform.uniforms[0], item->id);
                     fixcount++;
                 }
                 else
@@ -366,7 +340,7 @@ command_result fix_clothing_ownership(color_ostream &out, df::unit* unit)
         }
     }
     // clear uniform_drop (without this they would drop their clothes and pick them up some time later)
-    unit->military.uniform_drop.clear();
+    unit->uniform.uniform_drop.clear();
     out << "ownership for " << fixcount << " clothes fixed" << endl;
     return CR_OK;
 }
@@ -766,24 +740,7 @@ static command_result tweak(color_ostream &out, vector <string> &parameters)
 
     string cmd = parameters[0];
 
-    if (cmd == "clear-missing")
-    {
-        df::unit *unit = getSelectedUnit(out, true);
-        if (!unit)
-            return CR_FAILURE;
-
-        auto death = df::incident::find(unit->counters.death_id);
-
-        if (death)
-        {
-            death->flags.bits.discovered = true;
-
-            auto crime = df::crime::find(death->crime_id);
-            if (crime)
-                crime->flags.bits.discovered = true;
-        }
-    }
-    else if (cmd == "clear-ghostly")
+    if (cmd == "clear-ghostly")
     {
         df::unit *unit = getSelectedUnit(out, true);
         if (!unit)
@@ -794,7 +751,7 @@ static command_result tweak(color_ostream &out, vector <string> &parameters)
         {
             // remove ghostly, set to dead instead
             unit->flags3.bits.ghostly = 0;
-            unit->flags1.bits.dead = 1;
+            unit->flags1.bits.inactive = 1;
         }
         else
         {
@@ -829,7 +786,7 @@ static command_result tweak(color_ostream &out, vector <string> &parameters)
         // if it happens that the player has 'foreign' units of the same race
         // (vanilla df: dwarves not from mountainhome) on his map, just grab them
         if(!Units::isOwnCiv(unit))
-            unit->civ_id = ui->civ_id;
+            unit->civ_id = plotinfo->civ_id;
 
         return fix_clothing_ownership(out, unit);
     }
@@ -848,7 +805,7 @@ static command_result tweak(color_ostream &out, vector <string> &parameters)
         if(Units::isForest(unit))
             unit->flags1.bits.forest = 0;
         if(!Units::isOwnCiv(unit))
-            unit->civ_id = ui->civ_id;
+            unit->civ_id = plotinfo->civ_id;
         if(unit->profession == df::profession::MERCHANT)
             unit->profession = df::profession::TRADER;
         if(unit->profession2 == df::profession::MERCHANT)

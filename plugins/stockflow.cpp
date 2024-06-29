@@ -26,7 +26,7 @@ DFHACK_PLUGIN_IS_ENABLED(enabled);
 
 REQUIRE_GLOBAL(gps);
 REQUIRE_GLOBAL(world);
-REQUIRE_GLOBAL(ui);
+REQUIRE_GLOBAL(plotinfo);
 
 bool fast = false;
 const char *tagline = "Allow the bookkeeper to queue manager jobs.";
@@ -69,7 +69,7 @@ public:
         } else {
             // Gather orders when the bookkeeper starts updating stockpile records,
             // and enqueue them when the job is done.
-            for (df::job_list_link* link = &world->job_list; link != NULL; link = link->next) {
+            for (df::job_list_link* link = &world->jobs.list; link != NULL; link = link->next) {
                 if (link->item == NULL) continue;
                 if (link->item->job_type == job_type::UpdateStockpileRecords) {
                     found = true;
@@ -80,15 +80,15 @@ public:
 
         if (found) {
             // Entice the bookkeeper to spend less time update records.
-            ui->bookkeeper_precision += ui->bookkeeper_precision >> 3;
+            plotinfo->nobles.bookkeeper_precision += plotinfo->nobles.bookkeeper_precision >> 3;
             if (!bookkeeping) {
                 command_method("start_bookkeeping", out);
                 bookkeeping = true;
             }
         } else {
             // Entice the bookkeeper to update records more often.
-            ui->bookkeeper_precision -= ui->bookkeeper_precision >> 5;
-            ui->bookkeeper_cooldown -= ui->bookkeeper_cooldown >> 2;
+            plotinfo->nobles.bookkeeper_precision -= plotinfo->nobles.bookkeeper_precision >> 5;
+            plotinfo->nobles.bookkeeper_cooldown -= plotinfo->nobles.bookkeeper_cooldown >> 2;
             if (bookkeeping) {
                 command_method("finish_bookkeeping", out);
                 bookkeeping = false;
@@ -215,10 +215,7 @@ public:
         int y = dims.y2 - 3;
 
         int links = 0;
-        links += sp->links.give_to_pile.size();
-        links += sp->links.take_from_pile.size();
-        links += sp->links.give_to_workshop.size();
-        links += sp->links.take_from_workshop.size();
+        links += sp->take_from.size();
         if (links + 12 >= y)
            y += 1;
 

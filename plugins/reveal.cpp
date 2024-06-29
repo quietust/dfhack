@@ -41,7 +41,7 @@ bool isSafe(df::coord c)
     if (local_feature.type == feature_type::deep_special_tube || local_feature.type == feature_type::deep_surface_portal)
         return false;
     // And Hell *is* Hell.
-    if (global_feature.type == feature_type::feature_underworld_from_layer)
+    if (global_feature.type == feature_type::underworld_from_layer)
         return false;
     // otherwise it's safe.
     return true;
@@ -429,9 +429,6 @@ command_result revflood(color_ostream &out, vector<string> & params)
         case tiletype_shape::STAIR_UP:
         case tiletype_shape::RAMP:
         case tiletype_shape::FLOOR:
-        case tiletype_shape::BRANCH:
-        case tiletype_shape::TRUNK_BRANCH:
-        case tiletype_shape::TWIG:
         case tiletype_shape::SAPLING:
         case tiletype_shape::SHRUB:
         case tiletype_shape::BOULDER:
@@ -443,7 +440,7 @@ command_result revflood(color_ostream &out, vector<string> & params)
             above = sides = true;
             break;
         }
-        if (tileMaterial(tt) == tiletype_material::PLANT || tileMaterial(tt) == tiletype_material::MUSHROOM)
+        if (tileMaterial(tt) == tiletype_material::PLANT)
         {
             if(from_below)
                 unhide = 0;

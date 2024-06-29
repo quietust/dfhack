@@ -351,8 +351,8 @@ static command_result GetRawNames(color_ostream &stream, const MapRequest *in, R
         }
     }
     out->set_available(true);
-    for(int i = 0; i < world->raws.inorganics.size(); i++){
-        out->add_inorganic(world->raws.inorganics[i]->id);
+    for(int i = 0; i < world->raws.inorganics.all.size(); i++){
+        out->add_inorganic(world->raws.inorganics.all[i]->id);
     }
 
     for(int i = 0; i < world->raws.plants.all.size(); i++){

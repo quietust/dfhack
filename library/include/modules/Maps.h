@@ -45,8 +45,6 @@ distribution.
 #include "df/block_square_event_world_constructionst.h"
 #include "df/block_square_event_material_spatterst.h"
 #include "df/block_square_event_grassst.h"
-#include "df/block_square_event_spoorst.h"
-#include "df/block_square_event_item_spatterst.h"
 #include "df/tile_liquid.h"
 #include "df/tile_dig_designation.h"
 #include "df/tile_traffic.h"
@@ -117,7 +115,17 @@ enum BiomeOffset
  * map block flags wrapper
  * \ingroup grp_maps
  */
-typedef df::block_flags t_blockflags;
+union t_blockflags {
+    uint8_t whole;
+    struct
+    {
+        uint8_t designated : 1;
+        uint8_t update_temperature : 1;
+        uint8_t update_liquid : 1;
+        uint8_t update_liquid_twice : 1;
+    } bits;
+    t_blockflags(uint8_t f = 0) : whole(f) {}
+};
 
 /**
  * 16x16 array of tile types
@@ -305,9 +313,7 @@ extern DFHACK_EXPORT bool SortBlockEvents(df::map_block *block,
     std::vector<df::block_square_event_frozen_liquidst *>* ices = 0,
     std::vector<df::block_square_event_material_spatterst *>* materials = 0,
     std::vector<df::block_square_event_grassst *>* grass = 0,
-    std::vector<df::block_square_event_world_constructionst *>* constructions = 0,
-    std::vector<df::block_square_event_spoorst *>* spoors = 0,
-    std::vector<df::block_square_event_item_spatterst *>* items = 0
+    std::vector<df::block_square_event_world_constructionst *>* constructions = 0
 );
 
 /// remove a block event from the block by address

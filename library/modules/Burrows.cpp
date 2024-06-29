@@ -39,7 +39,7 @@ using namespace std;
 #include "MiscUtils.h"
 
 #include "DataDefs.h"
-#include "df/ui.h"
+#include "df/plotinfost.h"
 #include "df/burrow.h"
 #include "df/block_burrow.h"
 #include "df/block_burrow_link.h"
@@ -48,7 +48,7 @@ using namespace DFHack;
 using namespace df::enums;
 
 using df::global::world;
-using df::global::ui;
+using df::global::plotinfo;
 
 df::burrow *Burrows::findByName(std::string name)
 {
@@ -76,10 +76,10 @@ void Burrows::clearUnits(df::burrow *burrow)
     burrow->units.clear();
 
     // Sync ui if active
-    if (ui && ui->main.mode == ui_sidebar_mode::Burrows &&
-        ui->burrows.in_add_units_mode && ui->burrows.sel_id == burrow->id)
+    if (plotinfo && plotinfo->main.mode == ui_sidebar_mode::Burrows &&
+        plotinfo->burrows.in_add_units_mode && plotinfo->burrows.sel_id == burrow->id)
     {
-        auto &sel = ui->burrows.sel_units;
+        auto &sel = plotinfo->burrows.sel_units;
 
         for (size_t i = 0; i < sel.size(); i++)
             sel[i] = false;
@@ -96,7 +96,7 @@ bool Burrows::isAssignedUnit(df::burrow *burrow, df::unit *unit)
 
 void Burrows::setAssignedUnit(df::burrow *burrow, df::unit *unit, bool enable)
 {
-    using df::global::ui;
+    using df::global::plotinfo;
 
     CHECK_NULL_POINTER(unit);
     CHECK_NULL_POINTER(burrow);
@@ -112,13 +112,13 @@ void Burrows::setAssignedUnit(df::burrow *burrow, df::unit *unit, bool enable)
         erase_from_vector(burrow->units, unit->id);
     }
 
-    // Sync ui if active
-    if (ui && ui->main.mode == ui_sidebar_mode::Burrows &&
-        ui->burrows.in_add_units_mode && ui->burrows.sel_id == burrow->id)
+    // Sync plotinfo if active
+    if (plotinfo && plotinfo->main.mode == ui_sidebar_mode::Burrows &&
+        plotinfo->burrows.in_add_units_mode && plotinfo->burrows.sel_id == burrow->id)
     {
-        int idx = linear_index(ui->burrows.list_units, unit);
+        int idx = linear_index(plotinfo->burrows.list_units, unit);
         if (idx >= 0)
-            ui->burrows.sel_units[idx] = enable;
+            plotinfo->burrows.sel_units[idx] = enable;
     }
 }
 

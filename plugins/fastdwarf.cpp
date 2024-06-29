@@ -8,9 +8,9 @@
 #include "DataDefs.h"
 #include "df/world.h"
 #include "df/unit.h"
-#include "df/unit_action.h"
 #include "df/map_block.h"
 #include "df/units_other_id.h"
+#include "df/unit_relationship_type.h"
 
 using std::string;
 using std::vector;
@@ -56,11 +56,11 @@ DFhackCExport command_result plugin_onupdate ( color_ostream &out )
         if (enable_teledwarf) do
         {
             // skip dwarves that are dragging creatures or being dragged
-            if ((unit->relations.draggee_id != -1) || (unit->relations.dragger_id != -1))
+            if ((unit->relationship_ids[unit_relationship_type::Draggee] != -1) || (unit->relationship_ids[unit_relationship_type::Dragger] != -1))
                 break;
 
             // skip dwarves that are following other units
-            if (unit->relations.following != 0)
+            if (unit->following != 0)
                 break;
 
             // skip unconscious units
@@ -105,7 +105,7 @@ DFhackCExport command_result plugin_onupdate ( color_ostream &out )
                 for (size_t j = 0; j < world->units.other[units_other_id::ANY_RIDER].size(); j++)
                 {
                     df::unit *rider = world->units.other[units_other_id::ANY_RIDER][j];
-                    if (rider->relations.rider_mount_id == unit->id)
+                    if (rider->relationship_ids[unit_relationship_type::RiderMount] == unit->id)
                         rider->pos = unit->pos;
                 }
             }
@@ -113,64 +113,8 @@ DFhackCExport command_result plugin_onupdate ( color_ostream &out )
 
         if (enable_fastdwarf)
         {
-            for (size_t i = 0; i < unit->actions.size(); i++)
-            {
-                df::unit_action *action = unit->actions[i];
-                switch (action->type)
-                {
-                case unit_action_type::Move:
-                    action->data.move.timer = 1;
-                    break;
-                case unit_action_type::Attack:
-                    // Attacks are executed when timer1 reaches zero, which will be
-                    // on the following tick.
-                    if (action->data.attack.timer1 > 1)
-                        action->data.attack.timer1 = 1;
-                    // Attack actions are completed, and new ones generated, when
-                    // timer2 reaches zero.
-                    if (action->data.attack.timer2 > 1)
-                        action->data.attack.timer2 = 1;
-                    break;
-                case unit_action_type::HoldTerrain:
-                    action->data.holdterrain.timer = 1;
-                    break;
-                case unit_action_type::Climb:
-                    action->data.climb.timer = 1;
-                    break;
-                case unit_action_type::Job:
-                    action->data.job.timer = 1;
-                    // could also patch the unit->job.current_job->completion_timer
-                    break;
-                case unit_action_type::Talk:
-                    action->data.talk.timer = 1;
-                    break;
-                case unit_action_type::Unsteady:
-                    action->data.unsteady.timer = 1;
-                    break;
-                case unit_action_type::Dodge:
-                    action->data.dodge.timer = 1;
-                    break;
-                case unit_action_type::Recover:
-                    action->data.recover.timer = 1;
-                    break;
-                case unit_action_type::StandUp:
-                    action->data.standup.timer = 1;
-                    break;
-                case unit_action_type::LieDown:
-                    action->data.liedown.timer = 1;
-                    break;
-                case unit_action_type::Job2:
-                    action->data.job2.timer = 1;
-                    // could also patch the unit->job.current_job->completion_timer
-                    break;
-                case unit_action_type::PushObject:
-                    action->data.pushobject.timer = 1;
-                    break;
-                case unit_action_type::SuckBlood:
-                    action->data.suckblood.timer = 1;
-                    break;
-                }
-            }
+            if (unit->counters.job_counter > 0)
+                unit->counters.job_counter = 0;
         }
     }
     return CR_OK;

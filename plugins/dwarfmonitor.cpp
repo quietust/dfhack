@@ -4,7 +4,7 @@
 #include "DataDefs.h"
 
 #include "df/job.h"
-#include "df/ui.h"
+#include "df/plotinfost.h"
 #include "df/unit.h"
 #include "df/viewscreen_dwarfmodest.h"
 #include "df/world.h"
@@ -50,7 +50,7 @@ DFHACK_PLUGIN("dwarfmonitor");
 DFHACK_PLUGIN_IS_ENABLED(is_enabled);
 REQUIRE_GLOBAL(current_weather);
 REQUIRE_GLOBAL(world);
-REQUIRE_GLOBAL(ui);
+REQUIRE_GLOBAL(plotinfo);
 
 typedef int16_t activity_type;
 
@@ -99,18 +99,18 @@ static int get_happiness_cat(df::unit *unit)
 {
     if (!unit || !unit->status.current_soul)
         return 3;
-    int stress = unit->status.current_soul->personality.stress_level;
-    if (stress >= 500000)
+    int happy = unit->status.happiness;
+    if (happy == 0)
         return 0;
-    else if (stress >= 250000)
+    else if (happy <= 25)
         return 1;
-    else if (stress >= 100000)
+    else if (happy <= 50)
         return 2;
-    else if (stress >= 60000)
+    else if (happy < 75)
         return 3;
-    else if (stress >= 30000)
+    else if (happy < 125)
         return 4;
-    else if (stress >= 0)
+    else if (happy < 150)
         return 5;
     else
         return 6;
@@ -349,7 +349,7 @@ public:
             size_t count = window_days * ticks_per_day;
             for (auto entry = work_list->rbegin(); entry != work_list->rend() && count > 0; entry++, count--)
             {
-                if (*entry == JOB_UNKNOWN || *entry == job_type::DrinkBlood)
+                if (*entry == JOB_UNKNOWN)
                     continue;
 
                 ++dwarf_total;
@@ -608,12 +608,11 @@ public:
                     {
                     case job_type::Eat:
                     case job_type::Drink:
-                    case job_type::Drink2:
+                    case job_type::DrinkItem:
                     case job_type::Sleep:
                     case job_type::AttendParty:
                     case job_type::Rest:
                     case job_type::CleanSelf:
-                    case job_type::DrinkBlood:
                         real_activity = JOB_LEISURE;
                         break;
 
@@ -622,12 +621,9 @@ public:
                     case job_type::SeekInfant:
                     case job_type::SeekArtifact:
                     case job_type::GoShopping:
-                    case job_type::GoShopping2:
+                    case job_type::GoShoppingSpecific:
                     case job_type::RecoverPet:
-                    case job_type::CauseTrouble:
-                    case job_type::ReportCrime:
                     case job_type::BeatCriminal:
-                    case job_type::ExecuteCriminal:
                         real_activity = JOB_UNPRODUCTIVE;
                         break;
 
@@ -637,7 +633,6 @@ public:
                     case job_type::CarveRamp:
                     case job_type::DigChannel:
                     case job_type::Dig:
-                    case job_type::CarveTrack:
                     case job_type::CarveFortification:
                         real_activity = JOB_DESIGNATE;
                         break;
@@ -655,13 +650,10 @@ public:
                     case job_type::BringItemToShop:
                     case job_type::GetProvisions:
                     case job_type::FillWaterskin:
-                    case job_type::FillWaterskin2:
+                    case job_type::FillWaterskinItem:
                     case job_type::CheckChest:
                     case job_type::PickupEquipment:
                     case job_type::DumpItem:
-                    case job_type::PushTrackVehicle:
-                    case job_type::PlaceTrackVehicle:
-                    case job_type::StoreItemInVehicle:
                         real_activity = JOB_STORE_ITEM;
                         break;
 
@@ -801,7 +793,6 @@ public:
                     case job_type::ShearCreature:
                     case job_type::PenLargeAnimal:
                     case job_type::PenSmallAnimal:
-                    case job_type::TrainAnimal:
                         real_activity = JOB_ANIMALS;
                         break;
 
@@ -849,8 +840,8 @@ public:
                     case job_type::PlaceInTraction:
                     case job_type::GiveWater:
                     case job_type::GiveFood:
-                    case job_type::GiveWater2:
-                    case job_type::GiveFood2:
+                    case job_type::GiveWaterPet:
+                    case job_type::GiveFoodPet:
                     case job_type::BringCrutch:
                     case job_type::ApplyCast:
                         real_activity = JOB_MEDICAL;
@@ -1286,7 +1277,7 @@ struct preference_map
         }
 
         case (T_type::LikeShape):
-            label += "Shape    :" + raws.language.shapes[pref.shape_id]->name_plural;
+            label += "Shape    :" + raws.descriptors.shapes[pref.shape_id]->name_plural;
             break;
 
         case (T_type::LikeTree):
@@ -1297,7 +1288,7 @@ struct preference_map
         }
 
         case (T_type::LikeColor):
-            label += "Color    :" + raws.language.colors[pref.color_id]->name;
+            label += "Color    :" + raws.descriptors.colors[pref.color_id]->name;
             break;
         }
     }

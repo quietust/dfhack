@@ -158,8 +158,7 @@ bool World::isFortressMode(df::game_type t)
 {
     if (t == -1 && df::global::gametype)
         t = *df::global::gametype;
-    return (t == game_type::DWARF_MAIN || t == game_type::DWARF_RECLAIM ||
-        t == game_type::DWARF_UNRETIRE);
+    return (t == game_type::DWARF_MAIN || t == game_type::DWARF_RECLAIM);
 }
 
 bool World::isAdventureMode(df::game_type t)
