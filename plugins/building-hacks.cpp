@@ -19,7 +19,7 @@
 #include "df/coord.h"
 #include "df/tile_building_occ.h"
 #include "df/building_drawbuffer.h"
-#include "df/general_ref_creaturest.h" // needed for power information storage
+#include "df/general_ref_entity_art_image.h" // needed for power information storage
 #include "modules/Buildings.h"
 
 #include <map>
@@ -85,11 +85,11 @@ struct work_hook : df::building_workshopst{
     {
         if (workshop_hack_data* def = find_def())
         {
-            df::general_ref_creaturest* ref = static_cast<df::general_ref_creaturest*>(DFHack::Buildings::getGeneralRef(this, general_ref_type::CREATURE));
+            df::general_ref_entity_art_image* ref = static_cast<df::general_ref_entity_art_image*>(DFHack::Buildings::getGeneralRef(this, general_ref_type::ENTITY_ART_IMAGE));
             if (ref)
             {
-                info->produced = ref->anon_1;
-                info->consumed = ref->anon_2;
+                info->produced = ref->entity_id;
+                info->consumed = ref->index;
                 return true;
             }
             else
@@ -115,21 +115,21 @@ struct work_hook : df::building_workshopst{
                 target_machine->cur_power += produced - old_power.produced;
             }
         }
-        df::general_ref_creaturest* ref = static_cast<df::general_ref_creaturest*>(DFHack::Buildings::getGeneralRef(this, general_ref_type::CREATURE));
+        df::general_ref_entity_art_image* ref = static_cast<df::general_ref_entity_art_image*>(DFHack::Buildings::getGeneralRef(this, general_ref_type::ENTITY_ART_IMAGE));
         if (ref)
         {
-            ref->anon_1 = produced;
-            ref->anon_2 = consumed;
+            ref->entity_id = produced;
+            ref->index = consumed;
         }
         else
         {
-            ref = df::allocate<df::general_ref_creaturest>();
-            ref->anon_1 = produced;
-            ref->anon_2 = consumed;
+            ref = df::allocate<df::general_ref_entity_art_image>();
+            ref->entity_id = produced;
+            ref->index = consumed;
             general_refs.push_back(ref);
         }
     }
-    DEFINE_VMETHOD_INTERPOSE(uint32_t,getImpassableOccupancy,())
+    DEFINE_VMETHOD_INTERPOSE(df::tile_building_occ, getImpassableOccupancy,())
     {
         if(auto def = find_def())
         {

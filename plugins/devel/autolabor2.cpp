@@ -335,6 +335,8 @@ static const dwarf_state dwarf_states[] = {
     BUSY /* RemoveStairs */,
     BUSY /* ConstructQuern */,
     BUSY /* ConstructMillstone */,
+    OTHER /* UpgradeSquadEquipment */,
+    OTHER /* PrepareEquipmentManifests */,
     BUSY /* ConstructSplint */,
     BUSY /* ConstructCrutch */,
     BUSY /* ConstructTractionBench */,
@@ -348,28 +350,11 @@ static const dwarf_state dwarf_states[] = {
     BUSY /* SpinThread */,
     BUSY /* PenLargeAnimal */,
     BUSY /* PenSmallAnimal */,
+    OTHER /* Unknown220 */,
     BUSY /* MakeTool */,
     BUSY /* CollectClay */,
     BUSY /* InstallColonyInHive */,
     BUSY /* CollectHiveProducts */,
-    OTHER /* CauseTrouble */,
-    OTHER /* DrinkBlood */,
-    OTHER /* ReportCrime */,
-    OTHER /* ExecuteCriminal */,
-    BUSY /* TrainAnimal */,
-    BUSY /* CarveTrack */,
-    BUSY /* PushTrackVehicle */,
-    BUSY /* PlaceTrackVehicle */,
-    BUSY /* StoreItemInVehicle */,
-    BUSY /* GeldAnimal */,
-    BUSY /* MakeFigurine */,
-    BUSY /* MakeAmulet */,
-    BUSY /* MakeScepter */,
-    BUSY /* MakeCrown */,
-    BUSY /* MakeRing */,
-    BUSY /* MakeEarring */,
-    BUSY /* MakeBracelet */,
-    BUSY /* MakeGem */
 };
 
 struct labor_info
@@ -485,8 +470,7 @@ static const struct labor_default default_labor_infos[] = {
     /* GLAZING */               {200, 0, TOOL_NONE},
     /* PRESSING */              {200, 0, TOOL_NONE},
     /* BEEKEEPING */            {200, 0, TOOL_NONE},
-    /* WAX_WORKING */           {200, 0, TOOL_NONE},
-    /* PUSH_HAUL_VEHICLES */    {200, 0, TOOL_NONE}
+    /* WAX_WORKING */           {200, 0, TOOL_NONE}
 };
 
 struct dwarf_info_t
@@ -626,7 +610,6 @@ static df::unit_labor hauling_labor_map[] =
     df::unit_labor::HAUL_ITEM,    /* TOOL */
     df::unit_labor::HAUL_FURNITURE,    /* SLAB */
     df::unit_labor::HAUL_FOOD,    /* EGG */
-    df::unit_labor::HAUL_ITEM,    /* BOOK */
 };
 
 static df::unit_labor workshop_build_labor[] =
@@ -1328,24 +1311,6 @@ public:
         job_to_labor_table[df::job_type::CollectClay]            = jlf_const(df::unit_labor::POTTERY);
         job_to_labor_table[df::job_type::InstallColonyInHive]    = jlf_const(df::unit_labor::BEEKEEPING);
         job_to_labor_table[df::job_type::CollectHiveProducts]    = jlf_const(df::unit_labor::BEEKEEPING);
-        job_to_labor_table[df::job_type::CauseTrouble]            = jlf_no_labor;
-        job_to_labor_table[df::job_type::DrinkBlood]            = jlf_no_labor;
-        job_to_labor_table[df::job_type::ReportCrime]            = jlf_no_labor;
-        job_to_labor_table[df::job_type::ExecuteCriminal]        = jlf_no_labor;
-        job_to_labor_table[df::job_type::TrainAnimal]            = jlf_const(df::unit_labor::ANIMALTRAIN);
-        job_to_labor_table[df::job_type::CarveTrack]            = jlf_const(df::unit_labor::DETAIL);
-        job_to_labor_table[df::job_type::PushTrackVehicle]        = jlf_const(df::unit_labor::PUSH_HAUL_VEHICLE);
-        job_to_labor_table[df::job_type::PlaceTrackVehicle]        = jlf_const(df::unit_labor::PUSH_HAUL_VEHICLE);
-        job_to_labor_table[df::job_type::StoreItemInVehicle]    = jlf_const(df::unit_labor::PUSH_HAUL_VEHICLE);
-        job_to_labor_table[df::job_type::GeldAnimal]    = jlf_const(df::unit_labor::GELD);
-        job_to_labor_table[df::job_type::MakeFigurine]            = jlf_make_object;
-        job_to_labor_table[df::job_type::MakeAmulet]            = jlf_make_object;
-        job_to_labor_table[df::job_type::MakeScepter]            = jlf_make_object;
-        job_to_labor_table[df::job_type::MakeCrown]            = jlf_make_object;
-        job_to_labor_table[df::job_type::MakeRing]            = jlf_make_object;
-        job_to_labor_table[df::job_type::MakeEarring]            = jlf_make_object;
-        job_to_labor_table[df::job_type::MakeBracelet]            = jlf_make_object;
-        job_to_labor_table[df::job_type::MakeGem]            = jlf_make_object;
     };
 
     df::unit_labor find_job_labor(df::job* j)
@@ -1724,7 +1689,7 @@ private:
     {
         labor_needed.clear();
 
-        for (df::job_list_link* jll = world->job_list.next; jll; jll = jll->next)
+        for (df::job_list_link* jll = world->jobs.list.next; jll; jll = jll->next)
         {
             df::job* j = jll->item;
             if (!j)
@@ -2108,11 +2073,6 @@ public:
         labor_needed[df::unit_labor::HAUL_FURNITURE] += world->stockpile.num_jobs[8];
         labor_needed[df::unit_labor::HAUL_ANIMAL]    += world->stockpile.num_jobs[9];
 
-        // add entries for vehicle hauling
-
-        for (auto v = world->vehicles.all.begin(); v != world->vehicles.all.end(); v++)
-            if ((*v)->route_id != -1)
-                labor_needed[df::unit_labor::PUSH_HAUL_VEHICLE]++;
 
         // add fishing & hunting
 

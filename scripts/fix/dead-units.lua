@@ -9,15 +9,15 @@ to around 3000 units, and this script reduces it back.
 
 =end]]
 local units = df.global.world.units.active
-local dwarf_race = df.global.ui.race_id
-local dwarf_civ = df.global.ui.civ_id
+local dwarf_race = df.global.plotinfo.race_id
+local dwarf_civ = df.global.plotinfo.civ_id
 local count = 0
 
 for i=#units-1,0,-1 do
     local unit = units[i]
     local flags1 = unit.flags1
     local flags2 = unit.flags2
-    if flags1.dead and unit.race ~= dwarf_race then
+    if flags1.inactive and unit.race ~= dwarf_race then
         local remove = false
         if flags2.slaughter then
             remove = true

@@ -289,15 +289,6 @@ IF(DFHACK_PRERELEASE)
     )
 ENDIF()
 
-ADD_CUSTOM_TARGET(git-describe
-    COMMAND ${CMAKE_COMMAND}
-        -D dfhack_SOURCE_DIR:STRING=${dfhack_SOURCE_DIR}
-        -D GIT_EXECUTABLE:STRING=${GIT_EXECUTABLE}
-        -P ${CMAKE_CURRENT_SOURCE_DIR}/git-describe.cmake
-    COMMENT "Obtaining git commit information"
-)
-ADD_DEPENDENCIES(dfhack-version git-describe)
-
 ADD_LIBRARY(dfhack SHARED ${PROJECT_SOURCES})
 ADD_DEPENDENCIES(dfhack generate_headers)
 

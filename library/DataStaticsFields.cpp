@@ -6,7 +6,7 @@
 #ifndef STATIC_FIELDS_GROUP
 #include "df/world.h"
 #include "df/world_data.h"
-#include "df/ui.h"
+#include "df/plotinfost.h"
 #endif
 
 #include "DataIdentity.h"

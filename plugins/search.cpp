@@ -8,21 +8,18 @@
 #include "uicommon.h"
 
 #include "df/creature_raw.h"
-#include "df/ui_look_list.h"
+#include "df/lookinfost.h"
 #include "df/viewscreen_announcelistst.h"
 #include "df/viewscreen_petst.h"
 #include "df/viewscreen_storesst.h"
 #include "df/viewscreen_layer_stockpilest.h"
 #include "df/viewscreen_layer_militaryst.h"
 #include "df/viewscreen_layer_noblelistst.h"
-#include "df/viewscreen_workshop_profilest.h"
 #include "df/viewscreen_topicmeeting_fill_land_holder_positionsst.h"
 #include "df/viewscreen_tradegoodsst.h"
-#include "df/viewscreen_unitlistst.h"
+#include "df/viewscreen_unitjobsst.h"
 #include "df/viewscreen_buildinglistst.h"
-#include "df/viewscreen_joblistst.h"
 #include "df/historical_figure.h"
-#include "df/viewscreen_locationsst.h"
 #include "df/interface_key.h"
 #include "df/interfacest.h"
 #include "df/layer_object_listst.h"
@@ -49,7 +46,7 @@ DFHACK_PLUGIN_IS_ENABLED(is_enabled);
 
 REQUIRE_GLOBAL(gps);
 REQUIRE_GLOBAL(gview);
-REQUIRE_GLOBAL(ui);
+REQUIRE_GLOBAL(plotinfo);
 REQUIRE_GLOBAL(ui_building_assign_units);
 REQUIRE_GLOBAL(ui_building_in_assign);
 REQUIRE_GLOBAL(ui_building_item_cursor);
@@ -767,7 +764,6 @@ typedef search_multicolumn_modifiable_generic<df::viewscreen_petst, df::viewscre
 class pets_search : public pets_search_base
 {
     typedef df::viewscreen_petst::T_animal T_animal;
-    typedef df::viewscreen_petst::T_mode T_mode;
 public:
     void render() const
     {
@@ -777,7 +773,7 @@ public:
 private:
     bool can_init(df::viewscreen_petst *screen)
     {
-        return pets_search_base::can_init(screen) && screen->mode == T_mode::List;
+        return pets_search_base::can_init(screen);
     }
 
     int32_t *get_viewscreen_cursor()
@@ -804,7 +800,7 @@ private:
 
     bool should_check_input()
     {
-        return viewscreen->mode == T_mode::List;
+        return true;
     }
 
     bool is_valid_for_search(size_t i)
@@ -886,124 +882,6 @@ IMPLEMENT_HOOKS_WITH_ID(df::viewscreen_petst, pets_search, 1, 0);
 
 //
 // END: Animal screen search
-//
-
-
-//
-// START: Animal knowledge screen search
-//
-
-typedef search_generic<df::viewscreen_petst, int32_t> animal_knowledge_search_base;
-class animal_knowledge_search : public animal_knowledge_search_base
-{
-    typedef df::viewscreen_petst::T_mode T_mode;
-    bool can_init(df::viewscreen_petst *screen)
-    {
-        return animal_knowledge_search_base::can_init(screen) && screen->mode == T_mode::TrainingKnowledge;
-    }
-
-public:
-    void render() const
-    {
-        print_search_option(2, 4);
-    }
-
-private:
-    int32_t *get_viewscreen_cursor()
-    {
-        return NULL;
-    }
-
-    vector<int32_t> *get_primary_list()
-    {
-        return &viewscreen->known;
-    }
-
-    string get_element_description(int32_t id) const
-    {
-        auto craw = df::creature_raw::find(id);
-        string out;
-        if (craw)
-        {
-            for (size_t i = 0; i < 3; ++i)
-                out += craw->name[i] + " ";
-        }
-        return out;
-    }
-};
-
-IMPLEMENT_HOOKS_WITH_ID(df::viewscreen_petst, animal_knowledge_search, 2, 0);
-
-//
-// END: Animal knowledge screen search
-//
-
-
-//
-// START: Animal trainer search
-//
-
-typedef search_twocolumn_modifiable<df::viewscreen_petst, df::unit*, df::viewscreen_petst::T_trainer_mode> animal_trainer_search_base;
-class animal_trainer_search : public animal_trainer_search_base
-{
-    typedef df::viewscreen_petst::T_mode T_mode;
-    typedef df::viewscreen_petst::T_trainer_mode T_trainer_mode;
-
-    bool can_init(df::viewscreen_petst *screen)
-    {
-        return animal_trainer_search_base::can_init(screen) && screen->mode == T_mode::SelectTrainer;
-    }
-
-public:
-    void render() const
-    {
-        Screen::paintTile(Screen::Pen(186, 8, 0), 14, 2);
-        Screen::paintTile(Screen::Pen(186, 8, 0), gps->dimx - 14, 2);
-        Screen::paintTile(Screen::Pen(201, 8, 0), 14, 1);
-        Screen::paintTile(Screen::Pen(187, 8, 0), gps->dimx - 14, 1);
-        for (int x = 15; x <= gps->dimx - 15; ++x)
-        {
-            Screen::paintTile(Screen::Pen(205, 8, 0), x, 1);
-            Screen::paintTile(Screen::Pen(0, 0, 0), x, 2);
-        }
-        print_search_option(16, 2);
-    }
-
-private:
-    int32_t *get_viewscreen_cursor()
-    {
-        return &viewscreen->trainer_cursor;
-    }
-
-    vector<df::unit*> *get_primary_list()
-    {
-        return &viewscreen->trainer_unit;
-    }
-
-    string get_element_description(df::unit *u) const
-    {
-        return get_unit_description(u);
-    }
-
-    std::vector<T_trainer_mode> *get_secondary_list()
-    {
-        return &viewscreen->trainer_mode;
-    }
-
-public:
-    bool process_input(set<df::interface_key> *input)
-    {
-        if (input->count(interface_key::SELECT) && viewscreen->trainer_unit.empty() && !in_entry_mode())
-            return true;
-        return animal_trainer_search_base::process_input(input);
-    }
-
-};
-
-IMPLEMENT_HOOKS_WITH_ID(df::viewscreen_petst, animal_trainer_search, 3, 0);
-
-//
-// END: Animal trainer search
 //
 
 
@@ -1097,8 +975,8 @@ IMPLEMENT_HOOKS_PRIO(df::viewscreen_storesst, stocks_search, 100);
 //
 // START: Unit screen search
 //
-typedef search_twocolumn_modifiable<df::viewscreen_unitlistst, df::unit*, df::job*> unitlist_search_base;
-class unitlist_search : public unitlist_search_base
+typedef search_twocolumn_modifiable<df::viewscreen_unitjobsst, df::unit*, df::job*> unitjobs_search_base;
+class unitjobs_search : public unitjobs_search_base
 {
 public:
     void render() const
@@ -1109,7 +987,7 @@ public:
 private:
     void do_post_init()
     {
-        unitlist_search_base::do_post_init();
+        unitjobs_search_base::do_post_init();
         read_only = true;
     }
 
@@ -1182,22 +1060,22 @@ private:
 
     vector<df::job*> *get_secondary_list()
     {
-        return &viewscreen->jobs[viewscreen->page];
+        return &viewscreen->jobs;
     }
 
     int32_t *get_viewscreen_cursor()
     {
-        return &viewscreen->cursor_pos[viewscreen->page];
+        return &viewscreen->cursor_pos;
     }
 
     vector<df::unit*> *get_primary_list()
     {
-        return &viewscreen->units[viewscreen->page];
+        return &viewscreen->units;
     }
 };
 
-typedef generic_search_hook<df::viewscreen_unitlistst, unitlist_search> unitlist_search_hook;
-IMPLEMENT_HOOKS_PRIO(df::viewscreen_unitlistst, unitlist_search, 100);
+typedef generic_search_hook<df::viewscreen_unitjobsst, unitjobs_search> unitjobs_search_hook;
+IMPLEMENT_HOOKS_PRIO(df::viewscreen_unitjobsst, unitjobs_search, 100);
 
 //
 // END: Unit screen search
@@ -1207,7 +1085,7 @@ IMPLEMENT_HOOKS_PRIO(df::viewscreen_unitlistst, unitlist_search, 100);
 //
 // START: Trade screen search
 //
-class trade_search_base : public search_twocolumn_modifiable<df::viewscreen_tradegoodsst, df::item*, char>
+class trade_search_base : public search_twocolumn_modifiable<df::viewscreen_tradegoodsst, df::item*, uint8_t>
 {
 
 private:
@@ -1258,7 +1136,7 @@ class trade_search_merc : public trade_search_base
 public:
     virtual void render() const
     {
-        if (viewscreen->counteroffer.size() > 0)
+        if (viewscreen->counteroffer_item.size() > 0)
         {
             // The merchant is proposing a counteroffer.
             // Not only is there nothing to search,
@@ -1279,19 +1157,19 @@ public:
     }
 
 private:
-    vector<char> *get_secondary_list()
+    vector<uint8_t> *get_secondary_list()
     {
-        return &viewscreen->trader_selected;
+        return &viewscreen->selected[0];
     }
 
     int32_t *get_viewscreen_cursor()
     {
-        return &viewscreen->trader_cursor;
+        return &viewscreen->cursor[0];
     }
 
     vector<df::item*> *get_primary_list()
     {
-        return &viewscreen->trader_items;
+        return &viewscreen->items[0];
     }
 
     char get_search_select_key()
@@ -1308,7 +1186,7 @@ class trade_search_fort : public trade_search_base
 public:
     virtual void render() const
     {
-        if (viewscreen->counteroffer.size() > 0)
+        if (viewscreen->counteroffer_item.size() > 0)
         {
             // The merchant is proposing a counteroffer.
             // Not only is there nothing to search,
@@ -1329,19 +1207,19 @@ public:
     }
 
 private:
-    vector<char> *get_secondary_list()
+    vector<uint8_t> *get_secondary_list()
     {
-        return &viewscreen->broker_selected;
+        return &viewscreen->selected[1];
     }
 
     int32_t *get_viewscreen_cursor()
     {
-        return &viewscreen->broker_cursor;
+        return &viewscreen->cursor[1];
     }
 
     vector<df::item*> *get_primary_list()
     {
-        return &viewscreen->broker_items;
+        return &viewscreen->items[1];
     }
 
     char get_search_select_key()
@@ -1655,168 +1533,17 @@ IMPLEMENT_HOOKS(df::viewscreen_layer_noblelistst, nobles_search);
 //
 
 //
-// START: Workshop profiles search list
-//
-typedef search_generic<df::viewscreen_workshop_profilest, df::unit*> profiles_search_base;
-class profiles_search : public profiles_search_base
-{
-public:
-
-    bool can_init (df::viewscreen_workshop_profilest *screen)
-    {
-        return screen->tab == df::viewscreen_workshop_profilest::T_tab::Workers;
-    }
-
-    string get_element_description(df::unit *element) const
-    {
-        return get_unit_description(element);
-    }
-
-    void render() const
-    {
-        print_search_option(2, gps->dimy - 5);
-    }
-
-    vector<df::unit *> *get_primary_list()
-    {
-        return &viewscreen->workers;
-    }
-
-    int32_t *get_viewscreen_cursor()
-    {
-        return &viewscreen->worker_idx;
-    }
-};
-
-IMPLEMENT_HOOKS(df::viewscreen_workshop_profilest, profiles_search);
-
-//
-// END: Workshop profiles search list
-//
-
-
-//
-// START: Job list search
-//
-void get_job_details(string &desc, df::job *job)
-{
-    string job_name = ENUM_KEY_STR(job_type,job->job_type);
-    for (size_t i = 0; i < job_name.length(); i++)
-    {
-        char c = job_name[i];
-        if (c >= 'A' && c <= 'Z')
-            desc += " ";
-        desc += c;
-    }
-    desc += ".";
-
-    df::item_type itype = ENUM_ATTR(job_type, item, job->job_type);
-
-    MaterialInfo mat(job);
-    if (itype == item_type::FOOD)
-        mat.decode(-1);
-
-    if (mat.isValid() || job->material_category.whole)
-    {
-        desc += mat.toString();
-        desc += ".";
-        if (job->material_category.whole)
-        {
-            desc += bitfield_to_string(job->material_category);
-            desc += ".";
-        }
-    }
-
-    if (!job->reaction_name.empty())
-    {
-        for (size_t i = 0; i < job->reaction_name.length(); i++)
-        {
-            if (job->reaction_name[i] == '_')
-                desc += " ";
-            else
-                desc += job->reaction_name[i];
-        }
-
-        desc += ".";
-    }
-
-    if (job->flags.bits.suspend)
-        desc += "suspended.";
-}
-
-typedef search_twocolumn_modifiable<df::viewscreen_joblistst, df::job*, df::unit*> joblist_search_base;
-class joblist_search : public joblist_search_base
-{
-public:
-    void render() const
-    {
-        print_search_option(2);
-    }
-
-private:
-    void do_post_init()
-    {
-        joblist_search_base::do_post_init();
-        read_only = true;
-    }
-
-    string get_element_description(df::job *element) const
-    {
-        if (!element)
-            return "no job.idle";
-
-        string desc;
-        desc.reserve(100);
-        get_job_details(desc, element);
-        df::unit *worker = DFHack::Job::getWorker(element);
-        if (worker)
-            desc += get_unit_description(worker);
-        else
-            desc += "Inactive";
-
-        return desc;
-    }
-
-    char get_search_select_key()
-    {
-        return 'q';
-    }
-
-    vector<df::unit*> *get_secondary_list()
-    {
-        return &viewscreen->units;
-    }
-
-    int32_t *get_viewscreen_cursor()
-    {
-        return &viewscreen->cursor_pos;
-    }
-
-    vector<df::job*> *get_primary_list()
-    {
-        return &viewscreen->jobs;
-    }
-};
-
-IMPLEMENT_HOOKS(df::viewscreen_joblistst, joblist_search);
-
-//
-// END: Job list search
-//
-
-
-//
 // START: Look menu search
 //
 
-typedef search_generic<df::viewscreen_dwarfmodest, df::ui_look_list::T_items*> look_menu_search_base;
+typedef search_generic<df::viewscreen_dwarfmodest, df::lookinfost*> look_menu_search_base;
 class look_menu_search : public look_menu_search_base
 {
-    typedef df::ui_look_list::T_items::T_type elt_type;
+    typedef df::lookinfost::T_type elt_type;
 public:
     bool can_init(df::viewscreen_dwarfmodest *screen)
     {
-        if (ui->main.mode == df::ui_sidebar_mode::LookAround)
+        if (plotinfo->main.mode == df::ui_sidebar_mode::LookAround)
         {
             return look_menu_search_base::can_init(screen);
         }
@@ -1824,7 +1551,7 @@ public:
         return false;
     }
 
-    string get_element_description(df::ui_look_list::T_items *element) const
+    string get_element_description(df::lookinfost *element) const
     {
         std::string desc = "";
         switch (element->type)
@@ -1849,7 +1576,7 @@ public:
 
     bool force_in_search (size_t i)
     {
-        df::ui_look_list::T_items *element = saved_list1[i];
+        df::lookinfost *element = saved_list1[i];
         switch (element->type)
         {
         case elt_type::Item:
@@ -1873,9 +1600,9 @@ public:
         print_search_option(x, y);
     }
 
-    vector<df::ui_look_list::T_items*> *get_primary_list()
+    vector<df::lookinfost*> *get_primary_list()
     {
-        return &ui_look_list->items;
+        return ui_look_list;
     }
 
     virtual int32_t * get_viewscreen_cursor()
@@ -1922,7 +1649,7 @@ class burrow_search : public burrow_search_base
 public:
     bool can_init(df::viewscreen_dwarfmodest *screen)
     {
-        if (ui->main.mode == df::ui_sidebar_mode::Burrows && ui->burrows.in_add_units_mode)
+        if (plotinfo->main.mode == df::ui_sidebar_mode::Burrows && plotinfo->burrows.in_add_units_mode)
         {
             return burrow_search_base::can_init(screen);
         }
@@ -1947,17 +1674,17 @@ public:
 
     vector<df::unit *> *get_primary_list()
     {
-        return &ui->burrows.list_units;
+        return &plotinfo->burrows.list_units;
     }
 
     vector<bool> *get_secondary_list()
     {
-        return &ui->burrows.sel_units;
+        return &plotinfo->burrows.sel_units;
     }
 
     virtual int32_t * get_viewscreen_cursor()
     {
-        return &ui->burrows.unit_cursor_pos;
+        return &plotinfo->burrows.unit_cursor_pos;
     }
 
 
@@ -1991,7 +1718,7 @@ class room_assign_search : public room_assign_search_base
 public:
     bool can_init(df::viewscreen_dwarfmodest *screen)
     {
-        if (ui->main.mode == df::ui_sidebar_mode::QueryBuilding && *ui_building_in_assign)
+        if (plotinfo->main.mode == df::ui_sidebar_mode::QueryBuilding && *ui_building_in_assign)
         {
             return room_assign_search_base::can_init(screen);
         }
@@ -2085,67 +1812,21 @@ IMPLEMENT_HOOKS(df::viewscreen_topicmeeting_fill_land_holder_positionsst, noble_
 // END: Noble suggestion search
 //
 
-//
-// START: Location occupation assignment search
-//
-
-typedef search_generic<df::viewscreen_locationsst, df::unit*> location_assign_occupation_search_base;
-class location_assign_occupation_search : public location_assign_occupation_search_base
-{
-public:
-    bool can_init (df::viewscreen_locationsst *screen)
-    {
-        return screen->menu == df::viewscreen_locationsst::AssignOccupation;
-    }
-
-    string get_element_description (df::unit *unit) const
-    {
-        return unit ? get_unit_description(unit) : "Nobody";
-    }
-
-    void render() const
-    {
-        print_search_option(37, gps->dimy - 3);
-    }
-
-    vector<df::unit*> *get_primary_list()
-    {
-        return &viewscreen->units;
-    }
-
-    virtual int32_t *get_viewscreen_cursor()
-    {
-        return &viewscreen->unit_idx;
-    }
-
-};
-
-IMPLEMENT_HOOKS(df::viewscreen_locationsst, location_assign_occupation_search);
-
-//
-// END: Location occupation assignment search
-//
-
 #define SEARCH_HOOKS \
-    HOOK_ACTION(unitlist_search_hook) \
+    HOOK_ACTION(unitjobs_search_hook) \
     HOOK_ACTION(roomlist_search_hook) \
     HOOK_ACTION(trade_search_merc_hook) \
     HOOK_ACTION(trade_search_fort_hook) \
     HOOK_ACTION(stocks_search_hook) \
     HOOK_ACTION(pets_search_hook) \
-    HOOK_ACTION(animal_knowledge_search_hook) \
-    HOOK_ACTION(animal_trainer_search_hook) \
     HOOK_ACTION(military_search_hook) \
     HOOK_ACTION(nobles_search_hook) \
-    HOOK_ACTION(profiles_search_hook) \
     HOOK_ACTION(announcement_search_hook) \
-    HOOK_ACTION(joblist_search_hook) \
     HOOK_ACTION(look_menu_search_hook) \
     HOOK_ACTION(burrow_search_hook) \
     HOOK_ACTION(stockpile_search_hook) \
     HOOK_ACTION(room_assign_search_hook) \
-    HOOK_ACTION(noble_suggest_search_hook) \
-    HOOK_ACTION(location_assign_occupation_search_hook)
+    HOOK_ACTION(noble_suggest_search_hook)
 
 DFhackCExport command_result plugin_enable ( color_ostream &out, bool enable)
 {

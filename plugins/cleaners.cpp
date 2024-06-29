@@ -22,7 +22,7 @@ DFHACK_PLUGIN("cleaners");
 REQUIRE_GLOBAL(world);
 REQUIRE_GLOBAL(cursor);
 
-command_result cleanmap (color_ostream &out, bool snow, bool mud, bool item_spatter)
+command_result cleanmap (color_ostream &out, bool snow, bool mud)
 {
     // Invoked from clean(), already suspended
     int num_blocks = 0, blocks_total = world->map.map_blocks.size();
@@ -55,11 +55,6 @@ command_result cleanmap (color_ostream &out, bool snow, bool mud, bool item_spat
                 if(!mud
                     && spatter->mat_type == builtin_mats::MUD
                     && spatter->mat_state == (short)matter_state::Solid)
-                    continue;
-            }
-            else if (evt->getType() == block_square_event_type::item_spatter)
-            {
-                if (!item_spatter)
                     continue;
             }
             else
@@ -187,7 +182,6 @@ command_result clean (color_ostream &out, vector <string> & parameters)
     bool map = false;
     bool snow = false;
     bool mud = false;
-    bool item_spatter = false;
     bool units = false;
     bool items = false;
     bool plants = false;
@@ -212,8 +206,6 @@ command_result clean (color_ostream &out, vector <string> & parameters)
             snow = true;
         else if(parameters[i] == "mud")
             mud = true;
-        else if(parameters[i] == "item")
-            item_spatter = true;
         else
             return CR_WRONG_USAGE;
     }
@@ -223,7 +215,7 @@ command_result clean (color_ostream &out, vector <string> & parameters)
     CoreSuspender suspend;
 
     if(map)
-        cleanmap(out,snow,mud,item_spatter);
+        cleanmap(out,snow,mud);
     if(units)
         cleanunits(out);
     if(items)

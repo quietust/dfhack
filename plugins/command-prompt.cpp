@@ -15,15 +15,15 @@
 #include <vector>
 
 #include "df/interface_key.h"
-#include "df/ui.h"
-#include "df/graphic.h"
+#include "df/plotinfost.h"
+#include "df/graphicst.h"
 #include "df/enabler.h"
 
 using namespace DFHack;
 using namespace df::enums;
 
 DFHACK_PLUGIN("command-prompt");
-REQUIRE_GLOBAL(ui);
+REQUIRE_GLOBAL(plotinfo);
 REQUIRE_GLOBAL(gps);
 REQUIRE_GLOBAL(enabler);
 

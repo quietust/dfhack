@@ -16,7 +16,7 @@
 #include <string.h>
 
 #include <VTableInterpose.h>
-#include "df/graphic.h"
+#include "df/graphicst.h"
 #include "df/building_trapst.h"
 #include "df/builtin_mats.h"
 #include "df/world.h"
@@ -24,9 +24,9 @@
 #include "df/machine.h"
 #include "df/machine_info.h"
 #include "df/building_drawbuffer.h"
-#include "df/ui.h"
+#include "df/plotinfost.h"
 #include "df/viewscreen_dwarfmodest.h"
-#include "df/ui_build_selector.h"
+#include "df/buildreq.h"
 #include "df/flow_info.h"
 #include "df/report.h"
 
@@ -41,8 +41,8 @@ using namespace df::enums;
 DFHACK_PLUGIN("power-meter");
 REQUIRE_GLOBAL(gps);
 REQUIRE_GLOBAL(world);
-REQUIRE_GLOBAL(ui);
-REQUIRE_GLOBAL(ui_build_selector);
+REQUIRE_GLOBAL(plotinfo);
+REQUIRE_GLOBAL(buildreq);
 
 static const uint32_t METER_BIT = 0x80000000U;
 
@@ -117,9 +117,9 @@ struct trap_hook : df::building_trapst {
                     int power = machine->cur_power - machine->min_power;
                     if (power < 0 || machine->cur_power <= 0)
                         continue;
-                    if (power < plate_info.track_min)
+                    if (power < plate_info.unit_min)
                         continue;
-                    if (power > plate_info.track_max && plate_info.track_max >= 0)
+                    if (power > plate_info.unit_max && plate_info.unit_max >= 0)
                         continue;
 
                     active = true;
@@ -184,8 +184,8 @@ static bool makePowerMeter(df::pressure_plate_info *info, int min_power, int max
     }
 
     init_plate_info(*info);
-    info->track_min = min_power;
-    info->track_max = max_power;
+    info->unit_min = min_power;
+    info->unit_max = max_power;
     info->flags.bits.citizens = invert;
     return true;
 }

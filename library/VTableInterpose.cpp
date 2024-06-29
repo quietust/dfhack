@@ -319,9 +319,11 @@ VMethodInterposeLinkBase::~VMethodInterposeLinkBase()
 
 VMethodInterposeLinkBase *VMethodInterposeLinkBase::get_first_interpose(virtual_identity *id)
 {
-    auto item = id->interpose_list[vmethod_idx];
-    if (!item)
+    auto pitem = id->interpose_list.find(vmethod_idx);
+    if (pitem == id->interpose_list.end())
         return NULL;
+
+    auto item = pitem->second;
 
     if (item->host != id)
         return NULL;

@@ -470,8 +470,8 @@ bool PlannedBuilding::assignItem(df::item *item)
 
     auto job = building->jobs[0];
 
-    for_each_(job->job_items, delete_item_fn);
-    job->job_items.clear();
+    for_each_(job->job_items.elements, delete_item_fn);
+    job->job_items.elements.clear();
     job->flags.bits.suspend = false;
 
     bool rough = false;

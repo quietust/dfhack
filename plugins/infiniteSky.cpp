@@ -12,7 +12,6 @@
 #include "df/map_block.h"
 #include "df/map_block_column.h"
 #include "df/world.h"
-#include "df/z_level_flags.h"
 
 #include <cstring>
 #include <string>
@@ -89,18 +88,18 @@ DFhackCExport command_result plugin_onupdate ( color_ostream &out )
             return CR_OK;
     }
 
-    if ( world->constructions.size() == constructionSize )
+    if ( world->event.constructions.size() == constructionSize )
         return CR_OK;
     int32_t zNow = world->map.z_count_block;
-    for ( size_t a = constructionSize; a < world->constructions.size(); a++ ) {
-        df::construction* construct = world->constructions[a];
+    for ( size_t a = constructionSize; a < world->event.constructions.size(); a++ ) {
+        df::construction* construct = world->event.constructions[a];
         if ( construct->pos.z+2 < zNow )
             continue;
         doInfiniteSky(out, 1);
         zNow = world->map.z_count_block;
         ///break;
     }
-    constructionSize = world->constructions.size();
+    constructionSize = world->event.constructions.size();
 
     return CR_OK;
 }
@@ -143,14 +142,8 @@ void doInfiniteSky(color_ostream& out, int32_t howMany) {
                 column->unmined_glyphs.push_back(glyphs);
             }
         }
-        df::z_level_flags* flags = new df::z_level_flags[z_count_block+1];
-        memcpy(flags, world->map_extras.z_level_flags, z_count_block*sizeof(df::z_level_flags));
-        flags[z_count_block].whole = 0;
-        flags[z_count_block].bits.update = 1;
         world->map.z_count_block++;
         world->map.z_count++;
-        delete[] world->map_extras.z_level_flags;
-        world->map_extras.z_level_flags = flags;
     }
 
 }

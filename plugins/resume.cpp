@@ -15,6 +15,7 @@
 #include "Types.h"
 #include "df/viewscreen_dwarfmodest.h"
 #include "df/world.h"
+#include "df/plotinfost.h"
 #include "df/building_constructionst.h"
 #include "df/building.h"
 #include "df/job.h"
@@ -38,7 +39,7 @@ DFHACK_PLUGIN("resume");
 #define PLUGIN_VERSION 0.2
 
 REQUIRE_GLOBAL(gps);
-REQUIRE_GLOBAL(ui);
+REQUIRE_GLOBAL(plotinfo);
 REQUIRE_GLOBAL(world);
 
 #ifndef HAVE_NULLPTR
@@ -123,7 +124,7 @@ void scan_for_suspended_buildings()
         if (job)
         {
             SuspendedBuilding sb(bld);
-            sb.is_planned = job->job_items.size() == 1 && job->job_items[0]->item_type == item_type::NONE;
+            sb.is_planned = job->job_items.elements.size() == 1 && job->job_items.elements[0]->item_type == item_type::NONE;
 
             auto it = resumed_buildings.begin();
 
@@ -222,7 +223,7 @@ struct resume_hook : public df::viewscreen_dwarfmodest
     {
         INTERPOSE_NEXT(render)();
 
-        if (enabled && DFHack::World::ReadPauseState() && ui->main.mode == ui_sidebar_mode::Default)
+        if (enabled && DFHack::World::ReadPauseState() && plotinfo->main.mode == ui_sidebar_mode::Default)
         {
             scan_for_suspended_buildings();
             show_suspended_buildings();

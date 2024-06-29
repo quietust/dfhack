@@ -162,7 +162,7 @@ end
 
 function can_modify(sel_item)
     return sel_item and sel_item.owner
-       and sel_item.can_use and not sel_item.owner.flags1.dead
+       and sel_item.can_use and not sel_item.owner.flags1.inactive
 end
 
 function RoomList:onRenderBody(dc)

@@ -19,7 +19,7 @@ for _,v in ipairs(df.global.world.units.all) do
     local fat = v.counters2.stored_fat
     if fat > 850000 then
         v.counters2.stored_fat = 500000
-        if v.race == df.global.ui.race_id then
+        if v.race == df.global.plotinfo.race_id then
             print(fat,dfhack.TranslateName(dfhack.units.getVisibleName(v)))
             num_fat = num_fat + 1
             if fat > 999990 then

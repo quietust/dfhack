@@ -19,7 +19,6 @@
 #include "df/general_ref_contained_in_itemst.h"
 #include "df/viewscreen_dwarfmodest.h"
 #include "df/viewscreen_layer_militaryst.h"
-#include "df/viewscreen_locationsst.h"
 #include "df/viewscreen_tradegoodsst.h"
 
 using namespace DFHack;
@@ -30,7 +29,7 @@ using std::vector;
 DFHACK_PLUGIN("confirm");
 DFHACK_PLUGIN_IS_ENABLED(is_enabled);
 REQUIRE_GLOBAL(gps);
-REQUIRE_GLOBAL(ui);
+REQUIRE_GLOBAL(plotinfo);
 
 typedef std::set<df::interface_key> ikey_set;
 command_result df_confirm (color_ostream &out, vector <string> & parameters);
@@ -86,7 +85,7 @@ public:
 };
 
 namespace trade {
-    static bool goods_selected (const std::vector<char> &selected)
+    static bool goods_selected (const std::vector<uint8_t> &selected)
     {
         for (auto it = selected.begin(); it != selected.end(); ++it)
             if (*it)
@@ -96,15 +95,15 @@ namespace trade {
     inline bool trader_goods_selected (df::viewscreen_tradegoodsst *screen)
     {
         CHECK_NULL_POINTER(screen);
-        return goods_selected(screen->trader_selected);
+        return goods_selected(screen->selected[0]);
     }
     inline bool broker_goods_selected (df::viewscreen_tradegoodsst *screen)
     {
         CHECK_NULL_POINTER(screen);
-        return goods_selected(screen->broker_selected);
+        return goods_selected(screen->selected[1]);
     }
 
-    static bool goods_all_selected(const std::vector<char> &selected, const std::vector<df::item*> &items)  \
+    static bool goods_all_selected(const std::vector<uint8_t> &selected, const std::vector<df::item*> &items)  \
     {
         for (size_t i = 0; i < selected.size(); ++i)
         {
@@ -131,12 +130,12 @@ namespace trade {
     inline bool trader_goods_all_selected(df::viewscreen_tradegoodsst *screen)
     {
         CHECK_NULL_POINTER(screen);
-        return goods_all_selected(screen->trader_selected, screen->trader_items);
+        return goods_all_selected(screen->selected[0], screen->items[0]);
     }
     inline bool broker_goods_all_selected(df::viewscreen_tradegoodsst *screen)
     {
         CHECK_NULL_POINTER(screen);
-        return goods_all_selected(screen->broker_selected, screen->broker_items);
+        return goods_all_selected(screen->selected[1], screen->items[1]);
     }
 }
 
@@ -454,7 +453,6 @@ DEFINE_CONFIRMATION(squad_disband,      viewscreen_layer_militaryst, 0);
 DEFINE_CONFIRMATION(uniform_delete,     viewscreen_layer_militaryst, 0);
 DEFINE_CONFIRMATION(note_delete,        viewscreen_dwarfmodest, 0);
 DEFINE_CONFIRMATION(route_delete,       viewscreen_dwarfmodest, 0);
-DEFINE_CONFIRMATION(location_retire,    viewscreen_locationsst, 0);
 
 DFhackCExport command_result plugin_init (color_ostream &out, vector <PluginCommand> &commands)
 {

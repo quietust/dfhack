@@ -38,7 +38,7 @@ using namespace df::enums;
 DFHACK_PLUGIN("eventful");
 REQUIRE_GLOBAL(gps);
 REQUIRE_GLOBAL(world);
-REQUIRE_GLOBAL(ui);
+REQUIRE_GLOBAL(plotinfo);
 
 typedef df::reaction_product_itemst item_product;
 
@@ -98,7 +98,7 @@ DEFINE_LUA_EVENT_NH_1(postWorkshopFillSidebarMenu, df::building_actual*);
 
 DEFINE_LUA_EVENT_NH_7(onReactionCompleting, df::reaction*, df::reaction_product_itemst*, df::unit *, std::vector<df::item*> *, std::vector<df::reaction_reagent*> *, std::vector<df::item*> *, bool *);
 DEFINE_LUA_EVENT_NH_6(onReactionComplete, df::reaction*, df::reaction_product_itemst*, df::unit *, std::vector<df::item*> *, std::vector<df::reaction_reagent*> *, std::vector<df::item*> *);
-DEFINE_LUA_EVENT_NH_5(onItemContaminateWound, df::item_actual*, df::unit*, df::unit_wound*, uint8_t, int16_t);
+DEFINE_LUA_EVENT_NH_5(onItemContaminateWound, df::item_actual*, df::unit*, df::unit_wound*, int32_t, int16_t);
 //projectiles
 DEFINE_LUA_EVENT_NH_2(onProjItemCheckImpact, df::proj_itemst*, bool);
 DEFINE_LUA_EVENT_NH_1(onProjItemCheckMovement, df::proj_itemst*);
@@ -293,17 +293,17 @@ struct product_hook : item_product {
     DEFINE_VMETHOD_INTERPOSE(
         void, produce,
         (df::unit *unit,
-         std::vector<df::reaction_product*> *out_products,
          std::vector<df::item*> *out_items,
          std::vector<df::reaction_reagent*> *in_reag,
          std::vector<df::item*> *in_items,
-         int32_t quantity, df::job_skill skill,
-         df::historical_entity *entity,  int32_t unk, df::world_site *site, void* unk2)
+         int quantity,
+         df::job_skill skill,
+         df::historical_entity *entity, df::world_site *site)
     ) {
         color_ostream_proxy out(Core::getInstance().getConsole());
         auto product = products[this];
         if ( !product ) {
-            INTERPOSE_NEXT(produce)(unit, out_products, out_items, in_reag, in_items, quantity, skill, entity, unk, site, unk2);
+            INTERPOSE_NEXT(produce)(unit, out_items, in_reag, in_items, quantity, skill, entity, site);
             return;
         }
         df::reaction* this_reaction=product->react;
@@ -315,7 +315,7 @@ struct product_hook : item_product {
 
         size_t out_item_count = out_items->size();
 
-        INTERPOSE_NEXT(produce)(unit, out_products, out_items, in_reag, in_items, quantity, skill, entity, unk, site, unk2);
+        INTERPOSE_NEXT(produce)(unit, out_items, in_reag, in_items, quantity, skill, entity, site);
         if ( out_items->size() == out_item_count )
             return;
         //if it produced something, call the scripts
@@ -329,7 +329,7 @@ IMPLEMENT_VMETHOD_INTERPOSE(product_hook, produce);
 struct item_hooks :df::item_actual {
         typedef df::item_actual interpose_base;
 
-        DEFINE_VMETHOD_INTERPOSE(void, contaminateWound,(df::unit* unit, df::unit_wound* wound, uint8_t a1, int16_t a2))
+        DEFINE_VMETHOD_INTERPOSE(void, contaminateWound,(df::unit* unit, df::unit_wound* wound, int32_t a1, int16_t a2))
         {
             CoreSuspendClaimer suspend;
             color_ostream_proxy out(Core::getInstance().getConsole());
@@ -397,7 +397,7 @@ static bool find_reactions(color_ostream &out)
 {
     reactions.clear();
 
-    auto &rlist = world->raws.reactions;
+    auto &rlist = world->raws.reactions.all;
 
     for (size_t i = 0; i < rlist.size(); i++)
     {

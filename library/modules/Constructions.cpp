@@ -44,6 +44,7 @@ using namespace std;
 
 #include "df/world.h"
 #include "df/job_item.h"
+#include "df/block_flags.h"
 #include "df/building_type.h"
 #include "df/building_constructionst.h"
 
@@ -58,19 +59,19 @@ bool Constructions::isValid()
 
 uint32_t Constructions::getCount()
 {
-    return world->constructions.size();
+    return world->event.constructions.size();
 }
 
 df::construction * Constructions::getConstruction(const int32_t index)
 {
     if (uint32_t(index) >= getCount())
         return NULL;
-    return world->constructions[index];
+    return world->event.constructions[index];
 }
 
 df::construction * Constructions::findAtTile(df::coord pos)
 {
-    for (auto it = world->constructions.begin(); it != world->constructions.end(); ++it) {
+    for (auto it = world->event.constructions.begin(); it != world->event.constructions.end(); ++it) {
         if ((*it)->pos == pos)
             return *it;
     }
@@ -82,7 +83,7 @@ bool Constructions::copyConstruction(const int32_t index, t_construction &out)
     if (uint32_t(index) >= getCount())
         return false;
 
-    out.origin = world->constructions[index];
+    out.origin = world->event.constructions[index];
 
     out.pos = out.origin->pos;
     out.item_type = out.origin->item_type;
@@ -170,7 +171,7 @@ bool Constructions::designateRemove(df::coord pos, bool *immediate)
     {
         auto &dsgn = block->designation[pos.x&15][pos.y&15];
         dsgn.bits.dig = tile_dig_designation::Default;
-        block->flags.bits.designated = true;
+        block->flags.set(block_flags::Designated);
         if (process_dig)
             *process_dig = true;
         return true;

@@ -33,7 +33,6 @@ distribution.
 
 #include "DataDefs.h"
 #include "df/init.h"
-#include "df/ui.h"
 #include "df/announcement_type.h"
 #include "df/announcement_flags.h"
 #include "df/unit_report_type.h"

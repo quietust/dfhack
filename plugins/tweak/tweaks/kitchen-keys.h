@@ -1,7 +1,7 @@
 using namespace DFHack;
 using namespace df::enums;
 
-using df::global::ui_sidebar_menus;
+using df::global::game;
 using df::global::ui_workshop_in_add;
 
 static df::interface_key kitchen_bindings[] = {
@@ -46,7 +46,7 @@ struct kitchen_keys_hook : df::viewscreen_dwarfmodest {
             {
                 if (input->count(kitchen_bindings[i]))
                 {
-                    ui_sidebar_menus->workshop_job.cursor = i;
+                    game->workshop_job.cursor = i;
                     input->clear();
                     input->insert(df::interface_key::SELECT);
                 }

@@ -11,10 +11,9 @@
 #include "LuaTools.h"
 
 #include "DataDefs.h"
-#include "df/ui.h"
+#include "df/plotinfost.h"
 #include "df/world.h"
-#include "df/viewscreen_joblistst.h"
-#include "df/viewscreen_unitlistst.h"
+#include "df/viewscreen_unitjobsst.h"
 #include "df/viewscreen_layer_militaryst.h"
 #include "df/viewscreen_layer_noblelistst.h"
 #include "df/viewscreen_layer_overall_healthst.h"
@@ -23,7 +22,6 @@
 #include "df/viewscreen_dwarfmodest.h"
 #include "df/viewscreen_petst.h"
 #include "df/viewscreen_storesst.h"
-#include "df/viewscreen_workshop_profilest.h"
 #include "df/layer_object_listst.h"
 #include "df/assign_trade_status.h"
 
@@ -38,7 +36,7 @@ using namespace DFHack;
 using namespace df::enums;
 
 DFHACK_PLUGIN("sort");
-REQUIRE_GLOBAL(ui);
+REQUIRE_GLOBAL(plotinfo);
 REQUIRE_GLOBAL(world);
 REQUIRE_GLOBAL(ui_building_in_assign);
 REQUIRE_GLOBAL(ui_building_item_cursor);
@@ -249,45 +247,27 @@ typedef void (*SortHandler)(color_ostream *pout, lua_State *L, int top,
 static std::map<std::string, SortHandler> unit_sorters;
 
 /*
- * Sort units in the 'u'nit list screen.
+ * Sort units in the 'u'nit and 'j'ob list screens.
  */
 
-DEFINE_SORT_HANDLER(unit_sorters, unitlist, "", units)
-{
-    PARSE_SPEC("units", parameters);
-
-    int page = units->page;
-
-    if (compute_order(*pout, L, top, &order, units->units[page]))
-    {
-        reorder_cursor(&units->cursor_pos[page], order);
-        reorder_vector(&units->units[page], order);
-        reorder_vector(&units->jobs[page], order);
-    }
-}
-
-/*
- * Sort units in the 'j'ob list screen.
- */
-
-DEFINE_SORT_HANDLER(unit_sorters, joblist, "", jobs)
+DEFINE_SORT_HANDLER(unit_sorters, unitjobs, "", unitjobs)
 {
     PARSE_SPEC("units", parameters);
 
     std::vector<df::unit*> units;
-    for (size_t i = 0; i < jobs->units.size(); i++)
+    for (size_t i = 0; i < unitjobs->units.size(); i++)
     {
-        auto unit = jobs->units[i];
-        if (!unit && jobs->jobs[i])
-            unit = Job::getWorker(jobs->jobs[i]);
+        auto unit = unitjobs->units[i];
+        if (!unit && unitjobs->jobs[i])
+            unit = Job::getWorker(unitjobs->jobs[i]);
         units.push_back(unit);
     }
 
     if (compute_order(*pout, L, top, &order, units))
     {
-        reorder_cursor(&jobs->cursor_pos, order);
-        reorder_vector(&jobs->units, order);
-        reorder_vector(&jobs->jobs, order);
+        reorder_cursor(&unitjobs->cursor_pos, order);
+        reorder_vector(&unitjobs->units, order);
+        reorder_vector(&unitjobs->jobs, order);
     }
 }
 
@@ -351,23 +331,6 @@ DEFINE_SORT_HANDLER(unit_sorters, pet, "/List", animals)
 }
 
 /*
- * Sort candidate trainers in the Animal page of the 'z' status screen.
- */
-
-DEFINE_SORT_HANDLER(unit_sorters, pet, "/SelectTrainer", animals)
-{
-    sort_null_first(parameters);
-    PARSE_SPEC("units", parameters);
-
-    if (compute_order(*pout, L, top, &order, animals->trainer_unit))
-    {
-        reorder_cursor(&animals->trainer_cursor, order);
-        reorder_vector(&animals->trainer_unit, order);
-        reorder_vector(&animals->trainer_mode, order);
-    }
-}
-
-/*
  * Sort units in the Health page of the 'z' status screen.
  */
 
@@ -395,11 +358,11 @@ DEFINE_SORT_HANDLER(unit_sorters, dwarfmode, "/Burrows/AddUnits", screen)
 {
     PARSE_SPEC("units", parameters);
 
-    if (compute_order(*pout, L, top, &order, ui->burrows.list_units))
+    if (compute_order(*pout, L, top, &order, plotinfo->burrows.list_units))
     {
-        reorder_cursor(&ui->burrows.unit_cursor_pos, order);
-        reorder_vector(&ui->burrows.list_units, order);
-        reorder_vector(&ui->burrows.sel_units, order);
+        reorder_cursor(&plotinfo->burrows.unit_cursor_pos, order);
+        reorder_vector(&plotinfo->burrows.list_units, order);
+        reorder_vector(&plotinfo->burrows.sel_units, order);
     }
 }
 
@@ -423,21 +386,6 @@ DEFINE_SORT_HANDLER(unit_sorters, dwarfmode, "/QueryBuilding/Some/Assign", scree
             reorder_vector(ui_building_assign_items, order);
             reorder_vector(ui_building_assign_is_marked, order);
         }
-    }
-}
-
-/*
- * Sort units in the workshop 'q'uery 'P'rofile modification screen.
- */
-
-DEFINE_SORT_HANDLER(unit_sorters, workshop_profile, "/Unit", profile)
-{
-    PARSE_SPEC("units", parameters);
-
-    if (compute_order(*pout, L, top, &order, profile->workers))
-    {
-        reorder_cursor(&profile->worker_idx, order);
-        reorder_vector(&profile->workers, order);
     }
 }
 
@@ -495,12 +443,11 @@ DEFINE_SORT_HANDLER(item_sorters, tradegoods, "/Items/Broker", trade)
 {
     PARSE_SPEC("items", parameters);
 
-    if (compute_order(*pout, L, top, &order, trade->broker_items))
+    if (compute_order(*pout, L, top, &order, trade->items[1]))
     {
-        reorder_cursor(&trade->broker_cursor, order);
-        reorder_vector(&trade->broker_items, order);
-        reorder_vector(&trade->broker_selected, order);
-        reorder_vector(&trade->broker_count, order);
+        reorder_cursor(&trade->cursor[1], order);
+        reorder_vector(&trade->items[1], order);
+        reorder_vector(&trade->selected[1], order);
     }
 }
 
@@ -508,12 +455,11 @@ DEFINE_SORT_HANDLER(item_sorters, tradegoods, "/Items/Trader", trade)
 {
     PARSE_SPEC("items", parameters);
 
-    if (compute_order(*pout, L, top, &order, trade->trader_items))
+    if (compute_order(*pout, L, top, &order, trade->items[0]))
     {
-        reorder_cursor(&trade->trader_cursor, order);
-        reorder_vector(&trade->trader_items, order);
-        reorder_vector(&trade->trader_selected, order);
-        reorder_vector(&trade->trader_count, order);
+        reorder_cursor(&trade->cursor[0], order);
+        reorder_vector(&trade->items[0], order);
+        reorder_vector(&trade->selected[0], order);
     }
 }
 

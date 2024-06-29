@@ -567,7 +567,7 @@ struct VeinGenerator
 bool VeinGenerator::init_biomes()
 {
     auto &mats = df::inorganic_raw::get_vector();
-    materials.resize(world->raws.inorganics.size());
+    materials.resize(world->raws.inorganics.all.size());
 
     for (size_t i = 0; i < mats.size(); i++)
     {
@@ -671,9 +671,6 @@ static bool isTransientMaterial(df::tiletype tile)
         case AIR:
         case LAVA_STONE:
         case PLANT:
-        case ROOT:
-        case TREE:
-        case MUSHROOM:
             return true;
 
         default:
@@ -910,7 +907,7 @@ bool VeinGenerator::adjust_layer_depth(df::coord2d column)
 
 bool VeinGenerator::scan_block_tiles(Block *b, df::coord2d column, int z)
 {
-    bool aquifer = b->getRaw()->flags.bits.has_aquifer;
+    bool aquifer = false; // FIXME: b->getRaw()->flags.bits.has_aquifer;
 
     for (int x = 0; x < 16; x++)
     {
@@ -1047,7 +1044,7 @@ void VeinGenerator::write_tiles()
 
 void VeinGenerator::write_block_tiles(Block *b, df::coord2d column, int z)
 {
-    bool aquifer = b->getRaw()->flags.bits.has_aquifer;
+    bool aquifer = false; // FIXME: b->getRaw()->flags.bits.has_aquifer;
 
     for (int x = 0; x < 16; x++)
     {
@@ -1312,12 +1309,12 @@ bool GeoLayer::form_veins(color_ostream &out)
                 );
             }
 
-            vptr->probability = std::max<int>(vptr->probability, info->vein_unk_38[i]);
+            vptr->probability = std::max<int>(vptr->probability, info->vein_freq[i]);
         }
         else
         {
             vptr = VeinExtent::Ptr(new VeinExtent(key));
-            vptr->probability = info->vein_unk_38[i];
+            vptr->probability = info->vein_freq[i];
             if (parent_id >= 0)
                 vptr->set_parent(refs[parent_id]);
 
@@ -1491,9 +1488,8 @@ void VeinGenerator::init_seeds()
 {
     MersenneRNG rng;
 
-    std::string seed = world->worldgen.worldgen_parms.seed;
-    seed.resize((seed.size()+3)&~3);
-    rng.init((uint32_t*)seed.data(), seed.size()/4, 10);
+    int32_t seed = world->worldgen.worldgen_parms.seed;
+    rng.init(seed, 10);
 
     for (size_t i = 0; i < materials.size(); i++)
     {

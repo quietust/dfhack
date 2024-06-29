@@ -12,5 +12,5 @@ df.global.timed_events:insert('#',{
     type = df.timed_event_type.Migrants,
     season = df.global.cur_season,
     season_ticks = df.global.cur_season_tick+1,
-    entity = df.historical_entity.find(df.global.ui.civ_id)
+    entity = df.historical_entity.find(df.global.plotinfo.civ_id)
 })

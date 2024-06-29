@@ -61,7 +61,7 @@
 #include "MiscUtils.h"
 #include <VTableInterpose.h>
 
-#include "df/ui.h"
+#include "df/plotinfost.h"
 #include "df/world.h"
 #include "df/world_raws.h"
 #include "df/building_def.h"
@@ -74,6 +74,7 @@
 #include <df/caste_raw.h>
 #include "df/unit_soul.h"
 #include "df/unit_wound.h"
+#include "df/unit_relationship_type.h"
 #include "df/viewscreen_dwarfmodest.h"
 #include "modules/Translation.h"
 
@@ -93,8 +94,8 @@ DFHACK_PLUGIN_IS_ENABLED(is_enabled);
 
 REQUIRE_GLOBAL(world);
 REQUIRE_GLOBAL(cursor);
-REQUIRE_GLOBAL(ui);
-REQUIRE_GLOBAL(ui_build_selector);
+REQUIRE_GLOBAL(plotinfo);
+REQUIRE_GLOBAL(buildreq);
 REQUIRE_GLOBAL(gps);
 REQUIRE_GLOBAL(cur_year);
 REQUIRE_GLOBAL(cur_year_tick);
@@ -107,7 +108,6 @@ REQUIRE_GLOBAL(ui_building_assign_items);
 REQUIRE_GLOBAL(ui_building_in_assign);
 
 REQUIRE_GLOBAL(ui_menu_width);
-REQUIRE_GLOBAL(ui_area_map_width);
 
 using namespace DFHack::Gui;
 
@@ -982,7 +982,7 @@ command_result assignUnitToCage(color_ostream& out, df::unit* unit, df::building
     }
 
     // don't assign owned pets to a cage. the owner will release them, resulting into infinite hauling (df bug)
-    if(unit->relations.pet_owner_id != -1)
+    if(unit->relationship_ids[unit_relationship_type::PetOwner] != -1)
         return CR_OK;
 
     // check if unit is already pastured or caged, remove refs where necessary
@@ -1183,7 +1183,7 @@ void zoneInfo(color_ostream & out, df::building* building, bool verbose)
     else if (civ->zone_flags.bits.pit_pond)
     {
         out << " (pit flags:" << civ->pit_flags.whole << ")";
-        if(civ->pit_flags.bits.is_pond)
+        if(civ->pit_flags.bits.keep_filled)
             out << ", pond";
         else
             out << ", pit";
@@ -2006,7 +2006,7 @@ command_result df_zone (color_ostream &out, vector <string> & parameters)
 
     if(!race_filter_set && (building_assign || cagezone_assign || unit_slaughter))
     {
-        string own_race_name = getRaceNameById(ui->race_id);
+        string own_race_name = getRaceNameById(plotinfo->race_id);
         out.color(COLOR_BROWN);
         out << "Default filter for " << parameters[0]
             << ": 'not (race " << own_race_name << " or own civilization)'; use 'race "
@@ -2362,8 +2362,8 @@ bool compareUnitAgesYounger(df::unit* i, df::unit* j)
     int32_t age_j = (int32_t) getAge(j, true);
     if(age_i == 0 && age_j == 0)
     {
-        age_i = i->relations.birth_time;
-        age_j = j->relations.birth_time;
+        age_i = i->birth_time;
+        age_j = j->birth_time;
     }
     return (age_i < age_j);
 }
@@ -2373,8 +2373,8 @@ bool compareUnitAgesOlder(df::unit* i, df::unit* j)
     int32_t age_j = (int32_t) getAge(j, true);
     if(age_i == 0 && age_j == 0)
     {
-        age_i = i->relations.birth_time;
-        age_j = j->relations.birth_time;
+        age_i = i->birth_time;
+        age_j = j->birth_time;
     }
     return (age_i > age_j);
 }
@@ -3078,9 +3078,6 @@ command_result autoButcher( color_ostream &out, bool verbose = false )
                 || isAvailableForAdoption(unit)
                 || unit->name.has_name )
                 w->PushProtectedUnit(unit);
-            else if (   isGay(unit)
-                     || isGelded(unit))
-                w->PushPriorityUnit(unit);
             else
                 w->PushUnit(unit);
         }
@@ -3925,8 +3922,8 @@ public:
             return;
 
         int left_margin = gps->dimx - 30;
-        int8_t a = *ui_menu_width;
-        int8_t b = *ui_area_map_width;
+        int8_t a = (*ui_menu_width)[0];
+        int8_t b = (*ui_menu_width)[1];
         if ((a == 1 && b > 1) || (a == 2 && b == 2))
             left_margin -= 24;
 
@@ -4038,14 +4035,14 @@ struct zone_hook : public df::viewscreen_dwarfmodest
 
     DEFINE_VMETHOD_INTERPOSE(void, render, ())
     {
-        if ( ( (ui->main.mode == ui_sidebar_mode::ZonesPenInfo || ui->main.mode == ui_sidebar_mode::ZonesPitInfo) &&
+        if ( ( (plotinfo->main.mode == ui_sidebar_mode::ZonesPenInfo || plotinfo->main.mode == ui_sidebar_mode::ZonesPitInfo) &&
             ui_building_assign_type && ui_building_assign_units &&
             ui_building_assign_is_marked && ui_building_assign_items &&
             ui_building_assign_type->size() == ui_building_assign_units->size() &&
             ui_building_item_cursor)
             // allow mode QueryBuilding, but only for cages (bedrooms will crash DF with this code, chains don't work either etc)
             ||
-            (   ui->main.mode == ui_sidebar_mode::QueryBuilding &&
+            (   plotinfo->main.mode == ui_sidebar_mode::QueryBuilding &&
                 ui_building_in_assign && *ui_building_in_assign &&
                 ui_building_assign_type && ui_building_assign_units &&
                 ui_building_assign_type->size() == ui_building_assign_units->size() &&
@@ -4056,7 +4053,7 @@ struct zone_hook : public df::viewscreen_dwarfmodest
             )
         {
             if (vector_get(*ui_building_assign_units, *ui_building_item_cursor))
-                filter.initialize(ui->main.mode);
+                filter.initialize(plotinfo->main.mode);
         }
         else
         {

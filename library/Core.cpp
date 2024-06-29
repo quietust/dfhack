@@ -61,8 +61,8 @@ using namespace std;
 
 using namespace DFHack;
 
-#include "df/ui.h"
-#include "df/ui_sidebar_menus.h"
+#include "df/plotinfost.h"
+#include "df/gamest.h"
 #include "df/world.h"
 #include "df/world_data.h"
 #include "df/interfacest.h"
@@ -70,7 +70,7 @@ using namespace DFHack;
 #include "df/viewscreen_game_cleanerst.h"
 #include "df/viewscreen_loadgamest.h"
 #include "df/viewscreen_savegamest.h"
-#include <df/graphic.h>
+#include <df/graphicst.h>
 
 #include <stdio.h>
 #include <iomanip>
@@ -246,10 +246,6 @@ static string dfhack_version_desc()
 {
     stringstream s;
     s << Version::dfhack_version() << " ";
-    if (Version::is_release())
-        s << "(release)";
-    else
-        s << "(development build " << Version::git_description() << ")";
     return s.str();
 }
 
@@ -1300,7 +1296,7 @@ bool Core::loadScriptFile(color_ostream &out, string fname, bool silent)
 
 static void run_dfhack_init(color_ostream &out, Core *core)
 {
-    if (!df::global::world || !df::global::ui || !df::global::gview)
+    if (!df::global::world || !df::global::plotinfo || !df::global::gview)
     {
         out.printerr("Key globals are missing, skipping loading dfhack.init.\n");
         return;
@@ -1455,8 +1451,6 @@ bool Core::Init()
     if(errorstate)
         return false;
 
-    fprintf(stderr, "DFHack build: %s\n", Version::git_description());
-
     // find out what we are...
     #ifdef LINUX_BUILD
         const char * path = "hack/symbols.xml";
@@ -1485,34 +1479,7 @@ bool Core::Init()
 
     if(!vinfo || !p->isIdentified())
     {
-        if (!Version::git_xml_match())
-        {
-            const char *msg = (
-                "*******************************************************\n"
-                "*               BIG, UGLY ERROR MESSAGE               *\n"
-                "*******************************************************\n"
-                "\n"
-                "This DF version is missing from hack/symbols.xml, and\n"
-                "you have compiled DFHack with a df-structures (xml)\n"
-                "version that does *not* match the version tracked in git.\n"
-                "\n"
-                "If you are not actively working on df-structures and you\n"
-                "expected DFHack to work, you probably forgot to run\n"
-                "\n"
-                "    git submodule update\n"
-                "\n"
-                "If this does not sound familiar, read Compile.rst and \n"
-                "recompile.\n"
-                "More details can be found in stderr.log in this folder.\n"
-            );
-            cout << msg << endl;
-            cerr << msg << endl;
-            fatal("Not a known DF version - XML version mismatch (see console or stderr.log)");
-        }
-        else
-        {
-            fatal("Not a known DF version.\n");
-        }
+        fatal("Not a known DF version.\n");
         errorstate = true;
         delete p;
         p = NULL;
@@ -1631,10 +1598,10 @@ bool Core::Init()
     if (!server->listen(RemoteClient::GetDefaultPort()))
         cerr << "TCP listen failed.\n";
 
-    if (df::global::ui_sidebar_menus)
+    if (df::global::game)
     {
         vector<string> args;
-        const string & raw = df::global::ui_sidebar_menus->command_line.raw;
+        const string & raw = df::global::game->command_line.original;
         size_t offset = 0;
         while (offset < raw.size())
         {
@@ -2185,7 +2152,6 @@ void Core::onStateChange(color_ostream &out, state_change_event event)
                 struct tm * timeinfo = localtime(&rawtime);
                 strftime(timebuf, sizeof(timebuf), "[%Y-%m-%dT%H:%M:%S%z] ", timeinfo);
                 evtlog << timebuf;
-                evtlog << "DFHack " << Version::git_description() << " on " << ostype << "; ";
                 evtlog << "cwd md5: " << md5w.getHashFromString(getHackPath()).substr(0, 10) << "; ";
                 evtlog << "save: " << world->cur_savegame.save_dir << "; ";
                 evtlog << sc_event_name(event) << "; ";
@@ -2198,12 +2164,6 @@ void Core::onStateChange(color_ostream &out, state_change_event event)
         }
     default:
         break;
-    }
-
-    if (event == SC_WORLD_LOADED && Version::is_prerelease())
-    {
-        runCommand(out, "gui/prerelease-warning");
-        std::cerr << "loaded map in prerelease build" << std::endl;
     }
 
     EventManager::onStateChange(out, event);
@@ -2256,14 +2216,14 @@ bool Core::ncurses_wgetch(int in, int & out)
     {
         int idx = in - KEY_F(1);
         // FIXME: copypasta, push into a method!
-        if(df::global::ui && df::global::gview)
+        if(df::global::plotinfo && df::global::gview)
         {
             df::viewscreen * ws = Gui::getCurViewscreen();
             if (strict_virtual_cast<df::viewscreen_dwarfmodest>(ws) &&
-                df::global::ui->main.mode != ui_sidebar_mode::Hotkeys &&
-                df::global::ui->main.hotkeys[idx].cmd == df::ui_hotkey::T_cmd::None)
+                df::global::plotinfo->main.mode != ui_sidebar_mode::Hotkeys &&
+                df::global::plotinfo->main.hotkeys[idx].cmd == df::ui_hotkey::T_cmd::None)
             {
-                setHotkeyCmd(df::global::ui->main.hotkeys[idx].name);
+                setHotkeyCmd(df::global::plotinfo->main.hotkeys[idx].name);
                 return false;
             }
             else
@@ -2374,7 +2334,7 @@ int Core::DFH_SDL_Event(SDL::Event* ev)
 bool Core::SelectHotkey(int sym, int modifiers)
 {
     // Find the topmost viewscreen
-    if (!df::global::gview || !df::global::ui)
+    if (!df::global::gview || !df::global::plotinfo)
         return false;
 
     df::viewscreen *screen = &df::global::gview->view;
@@ -2412,10 +2372,10 @@ bool Core::SelectHotkey(int sym, int modifiers)
                     idx += 8;
 
                 if (strict_virtual_cast<df::viewscreen_dwarfmodest>(screen) &&
-                    df::global::ui->main.mode != ui_sidebar_mode::Hotkeys &&
-                    df::global::ui->main.hotkeys[idx].cmd == df::ui_hotkey::T_cmd::None)
+                    df::global::plotinfo->main.mode != ui_sidebar_mode::Hotkeys &&
+                    df::global::plotinfo->main.hotkeys[idx].cmd == df::ui_hotkey::T_cmd::None)
                 {
-                    cmd = df::global::ui->main.hotkeys[idx].name;
+                    cmd = df::global::plotinfo->main.hotkeys[idx].name;
                 }
             }
         }

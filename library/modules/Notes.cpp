@@ -37,7 +37,7 @@ using namespace std;
 #include "Core.h"
 #include "modules/Notes.h"
 #include <DataDefs.h>
-#include "df/ui.h"
+#include "df/plotinfost.h"
 using namespace DFHack;
 
 Module* DFHack::createNotes()
@@ -48,5 +48,5 @@ Module* DFHack::createNotes()
 // FIXME: not even a wrapper now
 Notes::Notes()
 {
-    notes = (std::vector<t_note*>*) &df::global::ui->waypoints.points;
+    notes = (std::vector<t_note*>*) &df::global::plotinfo->waypoints.points;
 }

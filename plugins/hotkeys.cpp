@@ -2,7 +2,7 @@
 #include "listcolumn.h"
 
 #include "df/viewscreen_dwarfmodest.h"
-#include "df/ui.h"
+#include "df/plotinfost.h"
 
 #include "modules/Maps.h"
 #include "modules/World.h"

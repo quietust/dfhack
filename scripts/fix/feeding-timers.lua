@@ -25,7 +25,7 @@ end
 
 local fixcount = 0
 for _,unit in ipairs(df.global.world.units.all) do
- if dfhack.units.isCitizen(unit) and not (unit.flags1.dead) then
+ if dfhack.units.isCitizen(unit) and not (unit.flags1.inactive) then
   for _,v in pairs(unit.status.misc_traits) do
    local didfix = 0
    if v.id == 0 then -- I think this should have additional conditions...

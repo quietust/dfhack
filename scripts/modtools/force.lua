@@ -63,7 +63,7 @@ elseif not df.timed_event_type[args.eventType] then
 end
 
 if args.civ == 'player' then
- args.civ = df.historical_entity.find(df.global.ui.civ_id)
+ args.civ = df.historical_entity.find(df.global.plotinfo.civ_id)
 elseif args.civ then
  local civ = args.civ
  args.civ = findCiv(args.civ)
@@ -75,7 +75,7 @@ elseif args.eventType == 'Caravan' or args.eventType == 'Diplomat' then
 end
 
 if args.eventType == 'Migrants' then
- args.civ = df.historical_entity.find(df.global.ui.civ_id)
+ args.civ = df.historical_entity.find(df.global.plotinfo.civ_id)
 end
 
 local timedEvent = df.timed_event:new()

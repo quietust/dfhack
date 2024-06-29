@@ -18,10 +18,10 @@
 
 #include <VTableInterpose.h>
 #include "df/world.h"
-#include "df/ui.h"
-#include "df/graphic.h"
+#include "df/plotinfost.h"
+#include "df/graphicst.h"
 #include "df/enabler.h"
-#include "df/viewscreen_unitlistst.h"
+#include "df/viewscreen_unitjobsst.h"
 #include "df/interface_key.h"
 #include "df/unit.h"
 #include "df/unit_soul.h"
@@ -46,7 +46,7 @@ using namespace df::enums;
 DFHACK_PLUGIN("manipulator");
 DFHACK_PLUGIN_IS_ENABLED(is_enabled);
 REQUIRE_GLOBAL(world);
-REQUIRE_GLOBAL(ui);
+REQUIRE_GLOBAL(plotinfo);
 REQUIRE_GLOBAL(gps);
 REQUIRE_GLOBAL(enabler);
 
@@ -144,7 +144,6 @@ const SkillColumn columns[] = {
     {5, 6, profession::COOK, unit_labor::COOK, job_skill::COOK, "Co"},
     {5, 6, profession::PRESSER, unit_labor::PRESSING, job_skill::PRESSING, "Pr"},
     {5, 6, profession::BEEKEEPER, unit_labor::BEEKEEPING, job_skill::BEEKEEPING, "Be"},
-    {5, 6, profession::GELDER, unit_labor::GELD, job_skill::GELD, "Ge"},
 // Fishing/Related
     {6, 1, profession::FISHERMAN, unit_labor::FISH, job_skill::FISH, "Fi"},
     {6, 1, profession::FISH_CLEANER, unit_labor::CLEAN_FISH, job_skill::PROCESSFISH, "Cl"},
@@ -170,8 +169,6 @@ const SkillColumn columns[] = {
     {9, 9, profession::POTTER, unit_labor::POTTERY, job_skill::POTTERY, "Po"},
     {9, 9, profession::GLAZER, unit_labor::GLAZING, job_skill::GLAZING, "Gl"},
     {9, 9, profession::WAX_WORKER, unit_labor::WAX_WORKING, job_skill::WAX_WORKING, "Wx"},
-    {9, 9, profession::PAPERMAKER, unit_labor::PAPERMAKING, job_skill::PAPERMAKING, "Pa"},
-    {9, 9, profession::BOOKBINDER, unit_labor::BOOKBINDING, job_skill::BOOKBINDING, "Bk"},
 // Engineering
     {10, 12, profession::SIEGE_ENGINEER, unit_labor::SIEGECRAFT, job_skill::SIEGECRAFT, "En"},
     {10, 12, profession::SIEGE_OPERATOR, unit_labor::SIEGEOPERATE, job_skill::SIEGEOPERATE, "Op"},
@@ -186,17 +183,10 @@ const SkillColumn columns[] = {
     {11, 3, profession::NONE, unit_labor::HAUL_REFUSE, job_skill::NONE, "Re"},
     {11, 3, profession::NONE, unit_labor::HAUL_FURNITURE, job_skill::NONE, "Fu"},
     {11, 3, profession::NONE, unit_labor::HAUL_ANIMALS, job_skill::NONE, "An"},
-    {11, 3, profession::NONE, unit_labor::HANDLE_VEHICLES, job_skill::NONE, "Ve"},
-    {11, 3, profession::NONE, unit_labor::HAUL_TRADE, job_skill::NONE, "Tr"},
-    {11, 3, profession::NONE, unit_labor::HAUL_WATER, job_skill::NONE, "Wa"},
 // Other Jobs
     {12, 4, profession::ARCHITECT, unit_labor::ARCHITECT, job_skill::DESIGNBUILDING, "Ar"},
     {12, 4, profession::ALCHEMIST, unit_labor::ALCHEMIST, job_skill::ALCHEMY, "Al"},
     {12, 4, profession::NONE, unit_labor::CLEAN, job_skill::NONE, "Cl"},
-    {12, 4, profession::NONE, unit_labor::PULL_LEVER, job_skill::NONE, "Lv"},
-    {12, 4, profession::NONE, unit_labor::BUILD_ROAD, job_skill::NONE, "Ro"},
-    {12, 4, profession::NONE, unit_labor::BUILD_CONSTRUCTION, job_skill::NONE, "Co"},
-    {12, 4, profession::NONE, unit_labor::REMOVE_CONSTRUCTION, job_skill::NONE, "CR"},
 // Military - Weapons
     {13, 7, profession::WRESTLER, unit_labor::NONE, job_skill::WRESTLING, "Wr"},
     {13, 7, profession::AXEMAN, unit_labor::NONE, job_skill::AXE, "Ax"},
@@ -229,7 +219,6 @@ const SkillColumn columns[] = {
     {15, 8, profession::NONE, unit_labor::NONE, job_skill::SITUATIONAL_AWARENESS, "Ob"},
     {15, 8, profession::NONE, unit_labor::NONE, job_skill::COORDINATION, "Cr"},
     {15, 8, profession::NONE, unit_labor::NONE, job_skill::BALANCE, "Ba"},
-    {15, 8, profession::NONE, unit_labor::NONE, job_skill::CLIMBING, "Cl"},
 // Social
     {16, 3, profession::NONE, unit_labor::NONE, job_skill::PERSUASION, "Pe"},
     {16, 3, profession::NONE, unit_labor::NONE, job_skill::NEGOTIATION, "Ne"},
@@ -256,22 +245,6 @@ const SkillColumn columns[] = {
     {19, 6, profession::NONE, unit_labor::NONE, job_skill::POETRY, "Po"},
     {19, 6, profession::NONE, unit_labor::NONE, job_skill::READING, "Rd"},
     {19, 6, profession::NONE, unit_labor::NONE, job_skill::SPEAKING, "Sp"},
-    {19, 6, profession::NONE, unit_labor::NONE, job_skill::DANCE, "Dn"},
-    {19, 6, profession::NONE, unit_labor::NONE, job_skill::MAKE_MUSIC, "MM"},
-    {19, 6, profession::NONE, unit_labor::NONE, job_skill::SING_MUSIC, "SM"},
-    {19, 6, profession::NONE, unit_labor::NONE, job_skill::PLAY_KEYBOARD_INSTRUMENT, "PK"},
-    {19, 6, profession::NONE, unit_labor::NONE, job_skill::PLAY_STRINGED_INSTRUMENT, "PS"},
-    {19, 6, profession::NONE, unit_labor::NONE, job_skill::PLAY_WIND_INSTRUMENT, "PW"},
-    {19, 6, profession::NONE, unit_labor::NONE, job_skill::PLAY_PERCUSSION_INSTRUMENT, "PP"},
-
-    {20, 4, profession::NONE, unit_labor::NONE, job_skill::CRITICAL_THINKING, "CT"},
-    {20, 4, profession::NONE, unit_labor::NONE, job_skill::LOGIC, "Lo"},
-    {20, 4, profession::NONE, unit_labor::NONE, job_skill::MATHEMATICS, "Ma"},
-    {20, 4, profession::NONE, unit_labor::NONE, job_skill::ASTRONOMY, "As"},
-    {20, 4, profession::NONE, unit_labor::NONE, job_skill::CHEMISTRY, "Ch"},
-    {20, 4, profession::NONE, unit_labor::NONE, job_skill::GEOGRAPHY, "Ge"},
-    {20, 4, profession::NONE, unit_labor::NONE, job_skill::OPTICS_ENGINEER, "OE"},
-    {20, 4, profession::NONE, unit_labor::NONE, job_skill::FLUID_ENGINEER, "FE"},
 
     {21, 5, profession::NONE, unit_labor::NONE, job_skill::MILITARY_TACTICS, "MT"},
     {21, 5, profession::NONE, unit_labor::NONE, job_skill::TRACKING, "Tr"},
@@ -313,7 +286,7 @@ enum altsort_mode {
     ALTSORT_NAME,
     ALTSORT_SELECTED,
     ALTSORT_DETAIL,
-    ALTSORT_STRESS,
+    ALTSORT_HAPPINESS,
     ALTSORT_ARRIVAL,
     ALTSORT_MAX
 };
@@ -375,17 +348,12 @@ bool sortByJob (const UnitInfo *d1, const UnitInfo *d2)
     return descending ? gt : !gt;
 }
 
-bool sortByStress (const UnitInfo *d1, const UnitInfo *d2)
+bool sortByHappiness (const UnitInfo *d1, const UnitInfo *d2)
 {
-    if (!d1->unit->status.current_soul)
-        return !descending;
-    if (!d2->unit->status.current_soul)
-        return descending;
-
     if (descending)
-        return (d1->unit->status.current_soul->personality.stress_level > d2->unit->status.current_soul->personality.stress_level);
+        return (d1->unit->status.happiness > d2->unit->status.happiness);
     else
-        return (d1->unit->status.current_soul->personality.stress_level < d2->unit->status.current_soul->personality.stress_level);
+        return (d1->unit->status.happiness < d2->unit->status.happiness);
 }
 
 bool sortByArrival (const UnitInfo *d1, const UnitInfo *d2)
@@ -572,7 +540,7 @@ namespace unit_ops {
         for (int i = 0; i < 2; i++)
         {
             if (name.words[i] >= 0)
-                ret += world->raws.language.words[name.words[i]]->forms[name.parts_of_speech[i].value];
+                ret += world->raws.language.words[name.words[i]]->forms[name.parts_of_speech[i]];
         }
         return Translation::capitalize(ret);
     }
@@ -1070,7 +1038,7 @@ private:
 };
 
 enum display_columns {
-    DISP_COLUMN_STRESS,
+    DISP_COLUMN_HAPPINESS,
     DISP_COLUMN_SELECTED,
     DISP_COLUMN_NAME,
     DISP_COLUMN_DETAIL,
@@ -1149,7 +1117,7 @@ viewscreen_unitlaborsst::viewscreen_unitlaborsst(vector<df::unit*> &src, int cur
         if (!Units::isOwnGroup(unit))
             cur->allowEdit = false;
 
-        if (unit->flags1.bits.dead)
+        if (unit->flags1.bits.inactive)
             cur->allowEdit = false;
 
         if (unit->flags2.bits.visitor)
@@ -1258,8 +1226,8 @@ void viewscreen_unitlaborsst::calcSize()
     // min/max width of columns
     int col_minwidth[DISP_COLUMN_MAX];
     int col_maxwidth[DISP_COLUMN_MAX];
-    col_minwidth[DISP_COLUMN_STRESS] = 6;
-    col_maxwidth[DISP_COLUMN_STRESS] = 6;
+    col_minwidth[DISP_COLUMN_HAPPINESS] = 4;
+    col_maxwidth[DISP_COLUMN_HAPPINESS] = 4;
     col_minwidth[DISP_COLUMN_SELECTED] = 1;
     col_maxwidth[DISP_COLUMN_SELECTED] = 1;
     col_minwidth[DISP_COLUMN_NAME] = 16;
@@ -1534,10 +1502,10 @@ void viewscreen_unitlaborsst::feed(set<df::interface_key> *events)
 
         switch (click_header)
         {
-        case DISP_COLUMN_STRESS:
+        case DISP_COLUMN_HAPPINESS:
             if (enabler->mouse_lbut || enabler->mouse_rbut)
             {
-                input_sort = ALTSORT_STRESS;
+                input_sort = ALTSORT_HAPPINESS;
                 if (enabler->mouse_lbut)
                     events->insert(interface_key::SECONDSCROLL_PAGEUP);
                 if (enabler->mouse_rbut)
@@ -1592,7 +1560,7 @@ void viewscreen_unitlaborsst::feed(set<df::interface_key> *events)
 
         switch (click_body)
         {
-        case DISP_COLUMN_STRESS:
+        case DISP_COLUMN_HAPPINESS:
             // do nothing
             break;
 
@@ -1616,7 +1584,7 @@ void viewscreen_unitlaborsst::feed(set<df::interface_key> *events)
             if (enabler->mouse_lbut)
             {
                 input_row = click_unit;
-                events->insert(interface_key::UNITJOB_VIEW_UNIT);
+                events->insert(interface_key::UNITJOB_VIEW);
             }
             if (enabler->mouse_rbut)
             {
@@ -1663,7 +1631,7 @@ void viewscreen_unitlaborsst::feed(set<df::interface_key> *events)
                         unit->status.labors[columns[i].labor] = false;
                 }
             }
-            unit->military.pickup_flags.bits.update = true;
+            unit->uniform.pickup_flags.bits.update = true;
         }
         unit->status.labors[col.labor] = newstatus;
     }
@@ -1687,7 +1655,7 @@ void viewscreen_unitlaborsst::feed(set<df::interface_key> *events)
                             unit->status.labors[columns[j].labor] = false;
                     }
                 }
-                unit->military.pickup_flags.bits.update = true;
+                unit->uniform.pickup_flags.bits.update = true;
             }
             unit->status.labors[columns[i].labor] = newstatus;
         }
@@ -1722,8 +1690,8 @@ void viewscreen_unitlaborsst::feed(set<df::interface_key> *events)
                 std::stable_sort(units.begin(), units.end(), sortByProfession);
             }
             break;
-        case ALTSORT_STRESS:
-            std::stable_sort(units.begin(), units.end(), sortByStress);
+        case ALTSORT_HAPPINESS:
+            std::stable_sort(units.begin(), units.end(), sortByHappiness);
             break;
         case ALTSORT_ARRIVAL:
             std::stable_sort(units.begin(), units.end(), sortByArrival);
@@ -1742,9 +1710,9 @@ void viewscreen_unitlaborsst::feed(set<df::interface_key> *events)
             altsort = ALTSORT_DETAIL;
             break;
         case ALTSORT_DETAIL:
-            altsort = ALTSORT_STRESS;
+            altsort = ALTSORT_HAPPINESS;
             break;
-        case ALTSORT_STRESS:
+        case ALTSORT_HAPPINESS:
             altsort = ALTSORT_ARRIVAL;
             break;
         case ALTSORT_ARRIVAL:
@@ -1826,17 +1794,17 @@ void viewscreen_unitlaborsst::feed(set<df::interface_key> *events)
         manager.save_from_unit(cur);
     }
 
-    if (VIRTUAL_CAST_VAR(unitlist, df::viewscreen_unitlistst, parent))
+    if (VIRTUAL_CAST_VAR(unitjobs, df::viewscreen_unitjobsst, parent))
     {
-        if (events->count(interface_key::UNITJOB_VIEW_UNIT) || events->count(interface_key::UNITJOB_ZOOM_CRE))
+        if (events->count(interface_key::UNITJOB_VIEW) || events->count(interface_key::UNITJOB_ZOOM_CRE))
         {
-            for (int i = 0; i < unitlist->units[unitlist->page].size(); i++)
+            for (int i = 0; i < unitjobs->units.size(); i++)
             {
-                if (unitlist->units[unitlist->page][i] == units[input_row]->unit)
+                if (unitjobs->units[i] == units[input_row]->unit)
                 {
-                    unitlist->cursor_pos[unitlist->page] = i;
-                    unitlist->feed(events);
-                    if (Screen::isDismissed(unitlist))
+                    unitjobs->cursor_pos = i;
+                    unitjobs->feed(events);
+                    if (Screen::isDismissed(unitjobs))
                         Screen::dismiss(this);
                     else
                         do_refresh_names = true;
@@ -1859,7 +1827,7 @@ void viewscreen_unitlaborsst::render()
     Screen::clear();
     Screen::drawBorder("  Dwarf Manipulator - Manage Labors  ");
 
-    Screen::paintString(Screen::Pen(' ', 7, 0), col_offsets[DISP_COLUMN_STRESS], 2, "Stress");
+    Screen::paintString(Screen::Pen(' ', 7, 0), col_offsets[DISP_COLUMN_HAPPINESS], 2, "Hap.");
     Screen::paintTile(Screen::Pen('\373', 7, 0), col_offsets[DISP_COLUMN_SELECTED], 2);
     Screen::paintString(Screen::Pen(' ', 7, 0), col_offsets[DISP_COLUMN_NAME], 2, "Name");
 
@@ -1891,9 +1859,9 @@ void viewscreen_unitlaborsst::render()
         Screen::paintTile(Screen::Pen(columns[col_offset].label[0], fg, bg), col_offsets[DISP_COLUMN_LABORS] + col, 1);
         Screen::paintTile(Screen::Pen(columns[col_offset].label[1], fg, bg), col_offsets[DISP_COLUMN_LABORS] + col, 2);
         df::profession profession = columns[col_offset].profession;
-        if ((profession != profession::NONE) && (ui->race_id != -1))
+        if ((profession != profession::NONE) && (plotinfo->race_id != -1))
         {
-            auto graphics = world->raws.creatures.all[ui->race_id]->graphics;
+            auto graphics = world->raws.creatures.all[plotinfo->race_id]->graphics;
             Screen::paintTile(
                 Screen::Pen(' ', fg, 0,
                     graphics.profession_add_color[creature_graphics_role::DEFAULT][profession],
@@ -1912,22 +1880,23 @@ void viewscreen_unitlaborsst::render()
         df::unit *unit = cur->unit;
         int8_t fg = 15, bg = 0;
 
-        int stress_lvl = unit->status.current_soul ? unit->status.current_soul->personality.stress_level : 0;
-        // cap at 6 digits
-        if (stress_lvl < -99999) stress_lvl = -99999;
-        if (stress_lvl > 999999) stress_lvl = 999999;
-        string stress = stl_sprintf("%6i", stress_lvl);
-        if (stress_lvl >= 500000)
+        int happy = cur->unit->status.happiness;
+        string happiness = stl_sprintf("%4i", happy);
+        if (happy == 0)         // miserable
             fg = 13;    // 5:1
-        else if (stress_lvl >= 250000)
+        else if (happy <= 25)   // very unhappy
             fg = 12;    // 4:1
-        else if (stress_lvl >= 100000)
+        else if (happy <= 50)   // unhappy
+            fg = 4;     // 4:0
+        else if (happy < 75)    // fine
             fg = 14;    // 6:1
-        else if (stress_lvl >= 0)
+        else if (happy < 125)   // quite content
+            fg = 6;     // 6:0
+        else if (happy < 150)   // happy
             fg = 2;     // 2:0
-        else
+        else                    // ecstatic
             fg = 10;    // 2:1
-        Screen::paintString(Screen::Pen(' ', fg, bg), col_offsets[DISP_COLUMN_STRESS], 4 + row, stress);
+        Screen::paintString(Screen::Pen(' ', fg, bg), col_offsets[DISP_COLUMN_HAPPINESS], 4 + row, happiness);
 
         Screen::paintTile(
             (cur->selected) ? Screen::Pen('\373', COLOR_LIGHTGREEN, 0) :
@@ -2081,7 +2050,7 @@ void viewscreen_unitlaborsst::render()
     OutputString(10, x, y, Screen::getKeyDisplay(interface_key::SELECT_ALL));
     OutputString(canToggle ? 15 : 8, x, y, ": Toggle Group, ");
 
-    OutputString(10, x, y, Screen::getKeyDisplay(interface_key::UNITJOB_VIEW_UNIT));
+    OutputString(10, x, y, Screen::getKeyDisplay(interface_key::UNITJOB_VIEW));
     OutputString(15, x, y, ": ViewCre, ");
 
     OutputString(10, x, y, Screen::getKeyDisplay(interface_key::UNITJOB_ZOOM_CRE));
@@ -2120,8 +2089,8 @@ void viewscreen_unitlaborsst::render()
             OutputString(15, x, y, "Profession");
         }
         break;
-    case ALTSORT_STRESS:
-        OutputString(15, x, y, "Stress Level");
+    case ALTSORT_HAPPINESS:
+        OutputString(15, x, y, "Happiness");
         break;
     case ALTSORT_ARRIVAL:
         OutputString(15, x, y, "Arrival");
@@ -2156,17 +2125,17 @@ df::unit *viewscreen_unitlaborsst::getSelectedUnit()
     return units[sel_row]->unit;
 }
 
-struct unitlist_hook : df::viewscreen_unitlistst
+struct unitjobs_hook : df::viewscreen_unitjobsst
 {
-    typedef df::viewscreen_unitlistst interpose_base;
+    typedef df::viewscreen_unitjobsst interpose_base;
 
     DEFINE_VMETHOD_INTERPOSE(void, feed, (set<df::interface_key> *input))
     {
         if (input->count(interface_key::UNITVIEW_PRF_PROF))
         {
-            if (units[page].size())
+            if (units.size())
             {
-                Screen::show(new viewscreen_unitlaborsst(units[page], cursor_pos[page]), plugin_self);
+                Screen::show(new viewscreen_unitlaborsst(units, cursor_pos), plugin_self);
                 return;
             }
         }
@@ -2177,7 +2146,7 @@ struct unitlist_hook : df::viewscreen_unitlistst
     {
         INTERPOSE_NEXT(render)();
 
-        if (units[page].size())
+        if (units.size())
         {
             auto dim = Screen::getWindowSize();
             int x = 2, y = dim.y - 2;
@@ -2187,8 +2156,8 @@ struct unitlist_hook : df::viewscreen_unitlistst
     }
 };
 
-IMPLEMENT_VMETHOD_INTERPOSE(unitlist_hook, feed);
-IMPLEMENT_VMETHOD_INTERPOSE(unitlist_hook, render);
+IMPLEMENT_VMETHOD_INTERPOSE(unitjobs_hook, feed);
+IMPLEMENT_VMETHOD_INTERPOSE(unitjobs_hook, render);
 
 DFhackCExport command_result plugin_enable(color_ostream &out, bool enable)
 {
@@ -2197,8 +2166,8 @@ DFhackCExport command_result plugin_enable(color_ostream &out, bool enable)
 
     if (enable != is_enabled)
     {
-        if (!INTERPOSE_HOOK(unitlist_hook, feed).apply(enable) ||
-            !INTERPOSE_HOOK(unitlist_hook, render).apply(enable))
+        if (!INTERPOSE_HOOK(unitjobs_hook, feed).apply(enable) ||
+            !INTERPOSE_HOOK(unitjobs_hook, render).apply(enable))
             return CR_FAILURE;
 
         is_enabled = enable;
@@ -2219,7 +2188,7 @@ DFhackCExport command_result plugin_init ( color_ostream &out, vector <PluginCom
 
 DFhackCExport command_result plugin_shutdown ( color_ostream &out )
 {
-    INTERPOSE_HOOK(unitlist_hook, feed).remove();
-    INTERPOSE_HOOK(unitlist_hook, render).remove();
+    INTERPOSE_HOOK(unitjobs_hook, feed).remove();
+    INTERPOSE_HOOK(unitjobs_hook, render).remove();
     return CR_OK;
 }

@@ -1,5 +1,3 @@
-#define DF_VERSION 42004
-
 // some headers required for a plugin. Nothing special, just the basics.
 #include "Core.h"
 #include <Console.h>
@@ -9,7 +7,7 @@
 // DF data structure definition headers
 #include "DataDefs.h"
 #include "df/world.h"
-#include "df/ui.h"
+#include "df/plotinfost.h"
 #include "df/item.h"
 #include "df/creature_raw.h"
 #include "df/caste_raw.h"
@@ -25,12 +23,6 @@
 #include "df/map_block_column.h"
 #include "df/plant.h"
 #include "df/plant_raw_flags.h"
-#if DF_VERSION > 40001
-#include "df/plant_tree_info.h"
-#include "df/plant_tree_tile.h"
-#include "df/plant_growth.h"
-#include "df/plant_growth_print.h"
-#endif
 #include "df/itemdef.h"
 #include "df/building_def_workshopst.h"
 #include "df/building_def_furnacest.h"
@@ -40,7 +32,6 @@
 #include "df/building_axle_horizontalst.h"
 #include "df/building_windmillst.h"
 #include "df/building_siegeenginest.h"
-#include "df/building_rollersst.h"
 #include "df/building_bridgest.h"
 
 #include "df/descriptor_color.h"
@@ -56,8 +47,6 @@
 #include "df/region_map_entry.h"
 #include "df/world_region_details.h"
 #include "df/world_region.h"
-#include "df/army.h"
-#include "df/army_flags.h"
 
 #include "df/unit.h"
 #include "df/creature_raw.h"
@@ -65,7 +54,7 @@
 #include "df/tissue.h"
 
 #include "df/enabler.h"
-#include "df/graphic.h"
+#include "df/graphicst.h"
 
 #include "df/viewscreen_choose_start_sitest.h"
 
@@ -103,14 +92,11 @@ using namespace RemoteFortressReader;
 using namespace std;
 
 DFHACK_PLUGIN("RemoteFortressReader");
-#if DF_VERSION < 40024
 using namespace df::global;
-#else
 REQUIRE_GLOBAL(world);
 REQUIRE_GLOBAL(gps);
-REQUIRE_GLOBAL(ui);
+REQUIRE_GLOBAL(plotinfo);
 REQUIRE_GLOBAL(gamemode);
-#endif
 
 // Here go all the command declarations...
 // mostly to allow having the mandatory stuff on top of the file and commands on the bottom
@@ -139,18 +125,6 @@ static command_result PassKeyboardEvent(color_ostream &stream, const KeyboardEve
 void CopyBlock(df::map_block * DfBlock, RemoteFortressReader::MapBlock * NetBlock, MapExtras::MapCache * MC, DFCoord pos);
 void FindChangedBlocks();
 
-const char* growth_locations[] = {
-    "TWIGS",
-    "LIGHT_BRANCHES",
-    "HEAVY_BRANCHES",
-    "TRUNK",
-    "ROOTS",
-    "CAP",
-    "SAPLING",
-    "SHRUB"
-};
-#define GROWTH_LOCATIONS_SIZE 8
-
 command_result dump_bp_mods(color_ostream &out, vector <string> & parameters)
 {
     remove("bp_appearance_mods.csv");
@@ -177,16 +151,16 @@ command_result dump_bp_mods(color_ostream &out, vector <string> & parameters)
                     output << "N/A;";
                 else
                     output << casteRaw->body_info.body_parts[casteRaw->bp_appearance.part_idx[partIndex]]->layers[layer]->layer_name << ";";
-                output << ENUM_KEY_STR(appearance_modifier_type, casteRaw->bp_appearance.modifiers[casteRaw->bp_appearance.modifier_idx[partIndex]]->type) << ";";
+                output << ENUM_KEY_STR(appearance_modifier_type, casteRaw->bp_appearance.modifiers[casteRaw->bp_appearance.modifier_idx[partIndex]]->modifier.type) << ";";
                 auto appMod = casteRaw->bp_appearance.modifiers[casteRaw->bp_appearance.modifier_idx[partIndex]];
-                if (appMod->growth_rate > 0)
+                if (appMod->modifier.growth_rate > 0)
                 {
-                    output << appMod->growth_min << " - " << appMod->growth_max << "\n";
+                    output << appMod->modifier.growth_min << " - " << appMod->modifier.growth_max << "\n";
                 }
                 else
                 {
-                    output << casteRaw->bp_appearance.modifiers[casteRaw->bp_appearance.modifier_idx[partIndex]]->ranges[0] << " - ";
-                    output << casteRaw->bp_appearance.modifiers[casteRaw->bp_appearance.modifier_idx[partIndex]]->ranges[6] << "\n";
+                    output << casteRaw->bp_appearance.modifiers[casteRaw->bp_appearance.modifier_idx[partIndex]]->modifier.ranges[0] << " - ";
+                    output << casteRaw->bp_appearance.modifiers[casteRaw->bp_appearance.modifier_idx[partIndex]]->modifier.ranges[6] << "\n";
                 }
             }
         }
@@ -545,32 +519,6 @@ void CopyBuilding(int buildingIndex, RemoteFortressReader::BuildingInstance * re
         break;
     case df::enums::building_type::Hive:
         break;
-    case df::enums::building_type::Rollers:
-    {
-        auto actual = strict_virtual_cast<df::building_rollersst>(local_build);
-        if (actual)
-        {
-            auto direction = actual->direction;
-            switch (direction)
-            {
-            case df::enums::screw_pump_direction::FromNorth:
-                remote_build->set_direction(NORTH);
-                break;
-            case df::enums::screw_pump_direction::FromEast:
-                remote_build->set_direction(EAST);
-                break;
-            case df::enums::screw_pump_direction::FromSouth:
-                remote_build->set_direction(SOUTH);
-                break;
-            case df::enums::screw_pump_direction::FromWest:
-                remote_build->set_direction(WEST);
-                break;
-            default:
-                break;
-            }
-        }
-    }
-    break;
     default:
         break;
     }
@@ -649,20 +597,6 @@ RemoteFortressReader::TiletypeMaterial TranslateMaterial(df::tiletype_material m
     case df::enums::tiletype_material::RIVER:
         return RemoteFortressReader::RIVER;
         break;
-#if DF_VERSION > 40001
-    case df::enums::tiletype_material::ROOT:
-        return RemoteFortressReader::ROOT;
-        break;
-    case df::enums::tiletype_material::TREE:
-        return RemoteFortressReader::TREE_MATERIAL;
-        break;
-    case df::enums::tiletype_material::MUSHROOM:
-        return RemoteFortressReader::MUSHROOM;
-        break;
-    case df::enums::tiletype_material::UNDERWORLD_GATE:
-        return RemoteFortressReader::UNDERWORLD_GATE;
-        break;
-#endif
     default:
         return RemoteFortressReader::NO_MATERIAL;
         break;
@@ -707,14 +641,6 @@ RemoteFortressReader::TiletypeSpecial TranslateSpecial(df::tiletype_special spec
     case df::enums::tiletype_special::WORN_3:
         return RemoteFortressReader::WORN_3;
         break;
-    case df::enums::tiletype_special::TRACK:
-        return RemoteFortressReader::TRACK;
-        break;
-#if DF_VERSION > 40001
-    case df::enums::tiletype_special::SMOOTH_DEAD:
-        return RemoteFortressReader::SMOOTH_DEAD;
-        break;
-#endif
     default:
         return RemoteFortressReader::NO_SPECIAL;
         break;
@@ -768,25 +694,6 @@ RemoteFortressReader::TiletypeShape TranslateShape(df::tiletype_shape shape)
     case df::enums::tiletype_shape::BROOK_TOP:
         return RemoteFortressReader::BROOK_TOP;
         break;
-#if DF_VERSION > 40001
-    case df::enums::tiletype_shape::BRANCH:
-        return RemoteFortressReader::BRANCH;
-        break;
-#endif
-#if DF_VERSION < 40001
-    case df::enums::tiletype_shape::TREE:
-        return RemoteFortressReader::TREE_SHAPE;
-        break;
-#endif
-#if DF_VERSION > 40001
-
-    case df::enums::tiletype_shape::TRUNK_BRANCH:
-        return RemoteFortressReader::TRUNK_BRANCH;
-        break;
-    case df::enums::tiletype_shape::TWIG:
-        return RemoteFortressReader::TWIG;
-        break;
-#endif
     case df::enums::tiletype_shape::SAPLING:
         return RemoteFortressReader::SAPLING;
         break;
@@ -931,7 +838,7 @@ static command_result GetMaterialList(color_ostream &stream, const EmptyMessage 
 
     df::world_raws *raws = &world->raws;
     MaterialInfo mat;
-    for (int i = 0; i < raws->inorganics.size(); i++)
+    for (int i = 0; i < raws->inorganics.all.size(); i++)
     {
         mat.decode(0, i);
         MaterialDefinition *mat_def = out->add_material_list();
@@ -939,9 +846,9 @@ static command_result GetMaterialList(color_ostream &stream, const EmptyMessage 
         mat_def->mutable_mat_pair()->set_mat_index(i);
         mat_def->set_id(mat.getToken());
         mat_def->set_name(mat.toString()); //find the name at cave temperature;
-        if (raws->inorganics[i]->material.state_color[GetState(&raws->inorganics[i]->material)] < raws->language.colors.size())
+        if (raws->inorganics.all[i]->material.state_color[GetState(&raws->inorganics.all[i]->material)] < raws->descriptors.colors.size())
         {
-            df::descriptor_color *color = raws->language.colors[raws->inorganics[i]->material.state_color[GetState(&raws->inorganics[i]->material)]];
+            df::descriptor_color *color = raws->descriptors.colors[raws->inorganics.all[i]->material.state_color[GetState(&raws->inorganics.all[i]->material)]];
             mat_def->mutable_state_color()->set_red(color->red * 255);
             mat_def->mutable_state_color()->set_green(color->green * 255);
             mat_def->mutable_state_color()->set_blue(color->blue * 255);
@@ -960,9 +867,9 @@ static command_result GetMaterialList(color_ostream &stream, const EmptyMessage 
             mat_def->mutable_mat_pair()->set_mat_index(j);
             mat_def->set_id(mat.getToken());
             mat_def->set_name(mat.toString()); //find the name at cave temperature;
-            if (raws->mat_table.builtin[i]->state_color[GetState(raws->mat_table.builtin[i])] < raws->language.colors.size())
+            if (raws->mat_table.builtin[i]->state_color[GetState(raws->mat_table.builtin[i])] < raws->descriptors.colors.size())
             {
-                df::descriptor_color *color = raws->language.colors[raws->mat_table.builtin[i]->state_color[GetState(raws->mat_table.builtin[i])]];
+                df::descriptor_color *color = raws->descriptors.colors[raws->mat_table.builtin[i]->state_color[GetState(raws->mat_table.builtin[i])]];
                 mat_def->mutable_state_color()->set_red(color->red * 255);
                 mat_def->mutable_state_color()->set_green(color->green * 255);
                 mat_def->mutable_state_color()->set_blue(color->blue * 255);
@@ -980,9 +887,9 @@ static command_result GetMaterialList(color_ostream &stream, const EmptyMessage 
             mat_def->mutable_mat_pair()->set_mat_index(i);
             mat_def->set_id(mat.getToken());
             mat_def->set_name(mat.toString()); //find the name at cave temperature;
-            if (creature->material[j]->state_color[GetState(creature->material[j])] < raws->language.colors.size())
+            if (creature->material[j]->state_color[GetState(creature->material[j])] < raws->descriptors.colors.size())
             {
-                df::descriptor_color *color = raws->language.colors[creature->material[j]->state_color[GetState(creature->material[j])]];
+                df::descriptor_color *color = raws->descriptors.colors[creature->material[j]->state_color[GetState(creature->material[j])]];
                 mat_def->mutable_state_color()->set_red(color->red * 255);
                 mat_def->mutable_state_color()->set_green(color->green * 255);
                 mat_def->mutable_state_color()->set_blue(color->blue * 255);
@@ -1000,9 +907,9 @@ static command_result GetMaterialList(color_ostream &stream, const EmptyMessage 
             mat_def->mutable_mat_pair()->set_mat_index(i);
             mat_def->set_id(mat.getToken());
             mat_def->set_name(mat.toString()); //find the name at cave temperature;
-            if (plant->material[j]->state_color[GetState(plant->material[j])] < raws->language.colors.size())
+            if (plant->material[j]->state_color[GetState(plant->material[j])] < raws->descriptors.colors.size())
             {
-                df::descriptor_color *color = raws->language.colors[plant->material[j]->state_color[GetState(plant->material[j])]];
+                df::descriptor_color *color = raws->descriptors.colors[plant->material[j]->state_color[GetState(plant->material[j])]];
                 mat_def->mutable_state_color()->set_red(color->red * 255);
                 mat_def->mutable_state_color()->set_green(color->green * 255);
                 mat_def->mutable_state_color()->set_blue(color->blue * 255);
@@ -1066,22 +973,6 @@ static command_result GetGrowthList(color_ostream &stream, const EmptyMessage *i
         basePlant->set_name(pp->name);
         basePlant->mutable_mat_pair()->set_mat_type(-1);
         basePlant->mutable_mat_pair()->set_mat_index(i);
-#if DF_VERSION > 40001
-        for (int g = 0; g < pp->growths.size(); g++)
-        {
-            df::plant_growth* growth = pp->growths[g];
-            if (!growth)
-                continue;
-            for (int l = 0; l < GROWTH_LOCATIONS_SIZE; l++)
-            {
-                MaterialDefinition * out_growth = out->add_material_list();
-                out_growth->set_id(pp->id + ":" + growth->id + +":" + growth_locations[l]);
-                out_growth->set_name(growth->name);
-                out_growth->mutable_mat_pair()->set_mat_type(g * 10 + l);
-                out_growth->mutable_mat_pair()->set_mat_index(i);
-            }
-        }
-#endif
     }
     return CR_OK;
 }
@@ -1094,67 +985,6 @@ void CopyBlock(df::map_block * DfBlock, RemoteFortressReader::MapBlock * NetBloc
 
     MapExtras::Block * block = MC->BlockAtTile(DfBlock->map_pos);
 
-    int trunk_percent[16][16];
-    int tree_x[16][16];
-    int tree_y[16][16];
-    int tree_z[16][16];
-    for (int xx = 0; xx < 16; xx++)
-        for (int yy = 0; yy < 16; yy++)
-        {
-            trunk_percent[xx][yy] = 255;
-            tree_x[xx][yy] = -3000;
-            tree_y[xx][yy] = -3000;
-            tree_z[xx][yy] = -3000;
-        }
-
-    df::map_block_column * column = df::global::world->map.column_index[(DfBlock->map_pos.x / 48) * 3][(DfBlock->map_pos.y / 48) * 3];
-    for (int i = 0; i < column->plants.size(); i++)
-    {
-        df::plant* plant = column->plants[i];
-        if (plant->tree_info == NULL)
-            continue;
-        df::plant_tree_info * tree_info = plant->tree_info;
-        if (
-            plant->pos.z - tree_info->roots_depth > DfBlock->map_pos.z
-            || (plant->pos.z + tree_info->body_height) <= DfBlock->map_pos.z
-            || (plant->pos.x - tree_info->dim_x / 2) > (DfBlock->map_pos.x + 16)
-            || (plant->pos.x + tree_info->dim_x / 2) < (DfBlock->map_pos.x)
-            || (plant->pos.y - tree_info->dim_y / 2) > (DfBlock->map_pos.y + 16)
-            || (plant->pos.y + tree_info->dim_y / 2) < (DfBlock->map_pos.y)
-            )
-            continue;
-        DFCoord localPos = plant->pos - DfBlock->map_pos;
-        for (int xx = 0; xx < tree_info->dim_x; xx++)
-            for (int yy = 0; yy < tree_info->dim_y; yy++)
-            {
-                int xxx = localPos.x - (tree_info->dim_x / 2) + xx;
-                int yyy = localPos.y - (tree_info->dim_y / 2) + yy;
-                if (xxx < 0
-                    || yyy < 0
-                    || xxx >= 16
-                    || yyy >= 16
-                    )
-                    continue;
-                df::plant_tree_tile tile;
-                if (-localPos.z < 0)
-                {
-                    tile = tree_info->roots[-1 + localPos.z][xx + (yy*tree_info->dim_x)];
-                }
-                else
-                {
-                    tile = tree_info->body[-localPos.z][xx + (yy*tree_info->dim_x)];
-                }
-                if (!tile.whole || tile.bits.blocked)
-                    continue;
-                if (tree_info->body_height <= 1)
-                    trunk_percent[xxx][yyy] = 0;
-                else
-                    trunk_percent[xxx][yyy] = -localPos.z * 100 / (tree_info->body_height - 1);
-                tree_x[xxx][yyy] = xx - tree_info->dim_x / 2;
-                tree_y[xxx][yyy] = yy - tree_info->dim_y / 2;
-                tree_z[xxx][yyy] = localPos.z;
-            }
-    }
     for (int yy = 0; yy < 16; yy++)
         for (int xx = 0; xx < 16; xx++)
         {
@@ -1196,10 +1026,6 @@ void CopyBlock(df::map_block * DfBlock, RemoteFortressReader::MapBlock * NetBloc
                     constructionItem->set_mat_index(con->item_subtype);
                 }
             }
-            NetBlock->add_tree_percent(trunk_percent[xx][yy]);
-            NetBlock->add_tree_x(tree_x[xx][yy]);
-            NetBlock->add_tree_y(tree_y[xx][yy]);
-            NetBlock->add_tree_z(tree_z[xx][yy]);
         }
 }
 
@@ -1446,44 +1272,31 @@ static command_result GetPlantList(color_ostream &stream, const BlockRequest *in
     int max_y = in->max_y() / 3;
     int max_z = in->max_z();
 
-#if DF_VERSION < 40001
-    //plants are gotten differently here
-#else
     for (int xx = min_x; xx < max_x; xx++)
         for (int yy = min_y; yy < max_y; yy++)
         {
-            if (xx < 0 || yy < 0 || xx >= world->map.x_count_block || yy >= world->map.y_count_block)
-                continue;
-            df::map_block_column * column = world->map.column_index[xx][yy];
-            for (int i = 0; i < column->plants.size(); i++)
+            for (int zz = min_z; zz < max_z; zz++)
             {
-                df::plant * plant = column->plants[i];
-                if (!plant->tree_info)
+                if (xx < 0 || yy < 0 || zz < 0 || xx >= world->map.x_count || yy >= world->map.y_count || zz >= world->map.z_count)
+                    continue;
+                df::map_block * block = world->map.block_index[xx][yy][zz];
+                for (int i = 0; i < block->plants.size(); i++)
                 {
+                    df::plant * plant = block->plants[i];
                     if (plant->pos.z < min_z || plant->pos.z >= max_z)
                         continue;
                     if (plant->pos.x < in->min_x() * 16 || plant->pos.x >= in->max_x() * 16)
                         continue;
                     if (plant->pos.y < in->min_y() * 16 || plant->pos.y >= in->max_y() * 16)
                         continue;
+                    RemoteFortressReader::PlantDef * out_plant = out->add_plant_list();
+                    out_plant->set_index(plant->material);
+                    out_plant->set_pos_x(plant->pos.x);
+                    out_plant->set_pos_y(plant->pos.y);
+                    out_plant->set_pos_z(plant->pos.z);
                 }
-                else
-                {
-                    if (plant->pos.z - plant->tree_info->roots_depth < min_z || plant->pos.z + plant->tree_info->body_height > max_z)
-                        continue;
-                    if (plant->pos.x - plant->tree_info->dim_x / 2 < in->min_x() * 16 || plant->pos.x + plant->tree_info->dim_x / 2 >= in->max_x() * 16)
-                        continue;
-                    if (plant->pos.y - plant->tree_info->dim_y / 2 < in->min_y() * 16 || plant->pos.y + plant->tree_info->dim_y / 2 >= in->max_y() * 16)
-                        continue;
-                }
-                RemoteFortressReader::PlantDef * out_plant = out->add_plant_list();
-                out_plant->set_index(plant->material);
-                out_plant->set_pos_x(plant->pos.x);
-                out_plant->set_pos_y(plant->pos.y);
-                out_plant->set_pos_z(plant->pos.z);
             }
         }
-#endif
     return CR_OK;
 }
 
@@ -1539,7 +1352,7 @@ static command_result GetViewInfo(color_ostream &stream, const EmptyMessage *in,
     auto embark = Gui::getViewscreenByType<df::viewscreen_choose_start_sitest>(0);
     if (embark)
     {
-        df::embark_location location = embark->location;
+        df::starter_infost location = embark->location;
         df::world_data * data = df::global::world->world_data;
         if (data && data->region_map)
         {
@@ -1555,8 +1368,6 @@ static command_result GetViewInfo(color_ostream &stream, const EmptyMessage *in,
     out->set_cursor_pos_x(cx);
     out->set_cursor_pos_y(cy);
     out->set_cursor_pos_z(cz);
-    out->set_follow_unit_id(ui->follow_unit);
-    out->set_follow_item_id(ui->follow_item);
     return CR_OK;
 }
 
@@ -1785,8 +1596,6 @@ static command_result GetBuildingDefList(color_ostream &stream, const EmptyMessa
             break;
         case df::enums::building_type::Hive:
             break;
-        case df::enums::building_type::Rollers:
-            break;
         default:
             break;
         }
@@ -1800,7 +1609,7 @@ DFCoord GetMapCenter()
     auto embark = Gui::getViewscreenByType<df::viewscreen_choose_start_sitest>(0);
     if (embark)
     {
-        df::embark_location location = embark->location;
+        df::starter_infost location = embark->location;
         output.x = (location.region_pos.x * 16) + 8;
         output.y = (location.region_pos.y * 16) + 8;
         output.z = 100;
@@ -1816,17 +1625,6 @@ DFCoord GetMapCenter()
         Maps::getPosition(x,y,z);
         output = DFCoord(x, y, z);
     }
-    else
-        for (int i = 0; i < df::global::world->armies.all.size(); i++)
-        {
-            df::army * thisArmy = df::global::world->armies.all[i];
-            if (thisArmy->flags.is_set(df::enums::army_flags::player))
-            {
-                output.x = (thisArmy->pos.x / 3) - 1;
-                output.y = (thisArmy->pos.y / 3) - 1;
-                output.z = thisArmy->pos.z;
-            }
-        }
     return output;
 }
 
@@ -1878,17 +1676,11 @@ static command_result GetWorldMap(color_ostream &stream, const EmptyMessage *in,
     auto poles = data->flip_latitude;
     switch (poles)
     {
-    case df::world_data::None:
-        out->set_world_poles(WorldPoles::NO_POLES);
-        break;
     case df::world_data::North:
         out->set_world_poles(WorldPoles::NORTH_POLE);
         break;
     case df::world_data::South:
         out->set_world_poles(WorldPoles::SOUTH_POLE);
-        break;
-    case df::world_data::Both:
-        out->set_world_poles(WorldPoles::BOTH_POLES);
         break;
     default:
         break;
@@ -2033,17 +1825,11 @@ static void CopyLocalMap(df::world_data * worldData, df::world_region_details* w
     auto poles = worldData->flip_latitude;
     switch (poles)
     {
-    case df::world_data::None:
-        out->set_world_poles(WorldPoles::NO_POLES);
-        break;
     case df::world_data::North:
         out->set_world_poles(WorldPoles::NORTH_POLE);
         break;
     case df::world_data::South:
         out->set_world_poles(WorldPoles::SOUTH_POLE);
-        break;
-    case df::world_data::Both:
-        out->set_world_poles(WorldPoles::BOTH_POLES);
         break;
     default:
         break;
@@ -2053,9 +1839,9 @@ static void CopyLocalMap(df::world_data * worldData, df::world_region_details* w
     df::world_region_details * east = NULL;
     df::world_region_details * southEast = NULL;
 
-    for (int i = 0; i < worldData->region_details.size(); i++)
+    for (int i = 0; i < worldData->midmap_data.region_details.size(); i++)
     {
-        auto region = worldData->region_details[i];
+        auto region = worldData->midmap_data.region_details[i];
         if (region->pos.x == pos_x + 1 && region->pos.y == pos_y + 1)
             southEast = region;
         else if (region->pos.x == pos_x + 1 && region->pos.y == pos_y)
@@ -2140,9 +1926,9 @@ static void CopyLocalMap(df::world_data * worldData, df::world_region_details* w
     df::world_region_details * east = NULL;
     df::world_region_details * southEast = NULL;
 
-    for (int i = 0; i < worldData->region_details.size(); i++)
+    for (int i = 0; i < worldData->midmap_data.region_details.size(); i++)
     {
-        auto region = worldData->region_details[i];
+        auto region = worldData->midmap_data.region_details[i];
         if (region->pos.x == pos_x + 1 && region->pos.y == pos_y + 1)
             southEast = region;
         else if (region->pos.x == pos_x + 1 && region->pos.y == pos_y)
@@ -2212,9 +1998,9 @@ static command_result GetRegionMaps(color_ostream &stream, const EmptyMessage *i
         return CR_FAILURE;
     }
     df::world_data * data = df::global::world->world_data;
-    for (int i = 0; i < data->region_details.size(); i++)
+    for (int i = 0; i < data->midmap_data.region_details.size(); i++)
     {
-        df::world_region_details * region = data->region_details[i];
+        df::world_region_details * region = data->midmap_data.region_details[i];
         if (!region)
             continue;
         WorldMap * regionMap = out->add_world_maps();
@@ -2230,9 +2016,9 @@ static command_result GetRegionMapsNew(color_ostream &stream, const EmptyMessage
         return CR_FAILURE;
     }
     df::world_data * data = df::global::world->world_data;
-    for (int i = 0; i < data->region_details.size(); i++)
+    for (int i = 0; i < data->midmap_data.region_details.size(); i++)
     {
-        df::world_region_details * region = data->region_details[i];
+        df::world_region_details * region = data->midmap_data.region_details[i];
         if (!region)
             continue;
         WorldMap * regionMap = out->add_world_maps();
@@ -2293,7 +2079,7 @@ static command_result GetCreatureRaws(color_ostream &stream, const EmptyMessage 
 
             send_caste->add_child_name(orig_caste->child_name[0]);
             send_caste->add_child_name(orig_caste->child_name[1]);
-            send_caste->set_gender(orig_caste->gender);
+            send_caste->set_gender(orig_caste->sex);
 
             for (int partIndex = 0; partIndex < orig_caste->body_info.body_parts.size(); partIndex++)
             {
@@ -2336,17 +2122,17 @@ static command_result GetCreatureRaws(color_ostream &stream, const EmptyMessage 
             {
                 auto send_mod = send_caste->add_modifiers();
                 auto orig_mod = orig_caste->bp_appearance.modifiers[k];
-                send_mod->set_type(ENUM_KEY_STR(appearance_modifier_type, orig_mod->type));
+                send_mod->set_type(ENUM_KEY_STR(appearance_modifier_type, orig_mod->modifier.type));
 
-                if (orig_mod->growth_rate > 0)
+                if (orig_mod->modifier.growth_rate > 0)
                 {
-                    send_mod->set_mod_min(orig_mod->growth_min);
-                    send_mod->set_mod_max(orig_mod->growth_max);
+                    send_mod->set_mod_min(orig_mod->modifier.growth_min);
+                    send_mod->set_mod_max(orig_mod->modifier.growth_max);
                 }
                 else
                 {
-                    send_mod->set_mod_min(orig_mod->ranges[0]);
-                    send_mod->set_mod_max(orig_mod->ranges[6]);
+                    send_mod->set_mod_min(orig_mod->modifier.ranges[0]);
+                    send_mod->set_mod_max(orig_mod->modifier.ranges[6]);
                 }
 
             }
@@ -2361,17 +2147,17 @@ static command_result GetCreatureRaws(color_ostream &stream, const EmptyMessage 
                 auto send_mod = send_caste->add_body_appearance_modifiers();
                 auto orig_mod = orig_caste->body_appearance_modifiers[k];
 
-                send_mod->set_type(ENUM_KEY_STR(appearance_modifier_type, orig_mod->type));
+                send_mod->set_type(ENUM_KEY_STR(appearance_modifier_type, orig_mod->modifier.type));
 
-                if (orig_mod->growth_rate > 0)
+                if (orig_mod->modifier.growth_rate > 0)
                 {
-                    send_mod->set_mod_min(orig_mod->growth_min);
-                    send_mod->set_mod_max(orig_mod->growth_max);
+                    send_mod->set_mod_min(orig_mod->modifier.growth_min);
+                    send_mod->set_mod_max(orig_mod->modifier.growth_max);
                 }
                 else
                 {
-                    send_mod->set_mod_min(orig_mod->ranges[0]);
-                    send_mod->set_mod_max(orig_mod->ranges[6]);
+                    send_mod->set_mod_min(orig_mod->modifier.ranges[0]);
+                    send_mod->set_mod_max(orig_mod->modifier.ranges[6]);
                 }
             }
             for (int k = 0; k < orig_caste->color_modifiers.size(); k++)
@@ -2381,13 +2167,13 @@ static command_result GetCreatureRaws(color_ostream &stream, const EmptyMessage 
 
                 for (int l = 0; l < orig_mod->pattern_index.size(); l++)
                 {
-                    auto orig_pattern = world->raws.language.patterns[orig_mod->pattern_index[l]];
+                    auto orig_pattern = world->raws.descriptors.patterns[orig_mod->pattern_index[l]];
                     auto send_pattern = send_mod->add_patterns();
 
                     for (int m = 0; m < orig_pattern->colors.size(); m++)
                     {
                         auto send_color = send_pattern->add_colors();
-                        auto orig_color = world->raws.language.colors[orig_pattern->colors[m]];
+                        auto orig_color = world->raws.descriptors.colors[orig_pattern->colors[m]];
                         send_color->set_red(orig_color->red * 255.0);
                         send_color->set_green(orig_color->green * 255.0);
                         send_color->set_blue(orig_color->blue * 255.0);
@@ -2449,47 +2235,13 @@ static command_result GetPlantRaws(color_ostream &stream, const EmptyMessage *in
             plant_remote->set_tile(plant_local->tiles.shrub_tile);
         else
             plant_remote->set_tile(plant_local->tiles.tree_tile);
-        for (int j = 0; j < plant_local->growths.size(); j++)
-        {
-            df::plant_growth* growth_local = plant_local->growths[j];
-            TreeGrowth * growth_remote = plant_remote->add_growths();
-            growth_remote->set_index(j);
-            growth_remote->set_id(growth_local->id);
-            growth_remote->set_name(growth_local->name);
-            for (int k = 0; k < growth_local->prints.size(); k++)
-            {
-                df::plant_growth_print* print_local = growth_local->prints[k];
-                GrowthPrint* print_remote = growth_remote->add_prints();
-                print_remote->set_priority(print_local->priority);
-                print_remote->set_color(print_local->color[0] | (print_local->color[2] * 8));
-                print_remote->set_timing_start(print_local->timing_start);
-                print_remote->set_timing_end(print_local->timing_end);
-                print_remote->set_tile(print_local->tile_growth);
-            }
-            growth_remote->set_timing_start(growth_local->timing_1);
-            growth_remote->set_timing_end(growth_local->timing_2);
-            growth_remote->set_twigs(growth_local->locations.bits.twigs);
-            growth_remote->set_light_branches(growth_local->locations.bits.light_branches);
-            growth_remote->set_heavy_branches(growth_local->locations.bits.heavy_branches);
-            growth_remote->set_trunk(growth_local->locations.bits.trunk);
-            growth_remote->set_roots(growth_local->locations.bits.roots);
-            growth_remote->set_cap(growth_local->locations.bits.cap);
-            growth_remote->set_sapling(growth_local->locations.bits.sapling);
-            growth_remote->set_timing_start(growth_local->timing_1);
-            growth_remote->set_timing_end(growth_local->timing_2);
-            growth_remote->set_trunk_height_start(growth_local->trunk_height_perc_1);
-            growth_remote->set_trunk_height_end(growth_local->trunk_height_perc_2);
-            auto growthMat = growth_remote->mutable_mat();
-            growthMat->set_mat_index(growth_local->mat_index);
-            growthMat->set_mat_type(growth_local->mat_type);
-        }
     }
     return CR_OK;
 }
 
 static command_result CopyScreen(color_ostream &stream, const EmptyMessage *in, ScreenCapture *out)
 {
-    df::graphic * gps = df::global::gps;
+    df::graphicst * gps = df::global::gps;
     out->set_width(gps->dimx);
     out->set_height(gps->dimy);
     for (int i = 0; i < (gps->dimx * gps->dimy); i++)

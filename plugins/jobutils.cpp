@@ -11,8 +11,8 @@
 
 #include "DataDefs.h"
 #include "df/world.h"
-#include "df/ui.h"
-#include "df/ui_build_selector.h"
+#include "df/plotinfost.h"
+#include "df/buildreq.h"
 #include "df/ui_build_item_req.h"
 #include "df/build_req_choice_genst.h"
 #include "df/build_req_choice_specst.h"
@@ -33,8 +33,8 @@ using namespace df::enums;
 
 DFHACK_PLUGIN("jobutils");
 REQUIRE_GLOBAL(world);
-REQUIRE_GLOBAL(ui);
-REQUIRE_GLOBAL(ui_build_selector);
+REQUIRE_GLOBAL(plotinfo);
+REQUIRE_GLOBAL(buildreq);
 REQUIRE_GLOBAL(ui_workshop_job_cursor);
 REQUIRE_GLOBAL(job_next_id);
 
@@ -48,7 +48,7 @@ static command_result job_cmd(color_ostream &out, vector <string> & parameters);
 
 DFhackCExport command_result plugin_init (color_ostream &out, std::vector <PluginCommand> &commands)
 {
-    if (!world || !ui)
+    if (!world || !plotinfo)
         return CR_FAILURE;
 
     commands.push_back(
@@ -67,7 +67,7 @@ DFhackCExport command_result plugin_init (color_ostream &out, std::vector <Plugi
         )
     );
 
-    if (ui_workshop_job_cursor || ui_build_selector) {
+    if (ui_workshop_job_cursor || buildreq) {
         commands.push_back(
             PluginCommand(
                 "job-material", "Alter the material of the selected job.",
@@ -149,9 +149,9 @@ static command_result job_material_in_job(color_ostream &out, MaterialInfo &new_
         return CR_FAILURE;
     }
 
-    for (size_t i = 0; i < job->job_items.size(); i++)
+    for (size_t i = 0; i < job->job_items.elements.size(); i++)
     {
-        df::job_item *item = job->job_items[i];
+        df::job_item *item = job->job_items.elements[i];
         MaterialInfo item_mat(item);
 
         if (item_mat != cur_mat)
@@ -173,9 +173,9 @@ static command_result job_material_in_job(color_ostream &out, MaterialInfo &new_
     job->mat_type = new_mat.type;
     job->mat_index = new_mat.index;
 
-    for (size_t i = 0; i < job->job_items.size(); i++)
+    for (size_t i = 0; i < job->job_items.elements.size(); i++)
     {
-        df::job_item *item = job->job_items[i];
+        df::job_item *item = job->job_items.elements[i];
         item->mat_type = new_mat.type;
         item->mat_index = new_mat.index;
     }
@@ -213,22 +213,21 @@ static bool build_choice_matches(df::ui_build_item_req *req, df::build_req_choic
 
 static command_result job_material_in_build(color_ostream &out, MaterialInfo &new_mat)
 {
-    df::ui_build_selector *sel = ui_build_selector;
-    df::ui_build_item_req *req = sel->requirements[ui_build_selector->req_index];
+    df::ui_build_item_req *req = buildreq->requirements[buildreq->req_index];
 
     // Loop through matching choices
-    bool matches = build_choice_matches(req, sel->choices[sel->sel_index], new_mat, true);
+    bool matches = build_choice_matches(req, buildreq->choices[buildreq->sel_index], new_mat, true);
 
-    size_t size = sel->choices.size();
-    int base = (matches ? sel->sel_index + 1 : 0);
+    size_t size = buildreq->choices.size();
+    int base = (matches ? buildreq->sel_index + 1 : 0);
 
     for (size_t i = 0; i < size; i++)
     {
         int idx = (base + i) % size;
 
-        if (build_choice_matches(req, sel->choices[idx], new_mat, false))
+        if (build_choice_matches(req, buildreq->choices[idx], new_mat, false))
         {
-            sel->sel_index = idx;
+            buildreq->sel_index = idx;
             return CR_OK;
         }
     }
@@ -252,9 +251,9 @@ static command_result job_material(color_ostream &out, vector <string> & paramet
     else
         return CR_WRONG_USAGE;
 
-    if (ui->main.mode == ui_sidebar_mode::QueryBuilding)
+    if (plotinfo->main.mode == ui_sidebar_mode::QueryBuilding)
         return job_material_in_job(out, new_mat);
-    if (ui->main.mode == ui_sidebar_mode::Build)
+    if (plotinfo->main.mode == ui_sidebar_mode::Build)
         return job_material_in_build(out, new_mat);
 
     return CR_WRONG_USAGE;
@@ -272,7 +271,7 @@ static command_result job_duplicate(color_ostream &out, vector <string> & parame
         return CR_FAILURE;
 
     if (!job->specific_refs.empty() ||
-        (job->job_items.empty() &&
+        (job->job_items.elements.empty() &&
          job->job_type != job_type::CollectSand &&
          job->job_type != job_type::CollectClay))
     {
@@ -304,12 +303,12 @@ static df::job_item *getJobItem(color_ostream &out, df::job *job, std::string id
         return NULL;
 
     int v = atoi(idx.c_str());
-    if (v < 1 || size_t(v) > job->job_items.size()) {
+    if (v < 1 || size_t(v) > job->job_items.elements.size()) {
         out.printerr("Invalid item index.\n");
         return NULL;
     }
 
-    return job->job_items[v-1];
+    return job->job_items.elements[v-1];
 }
 
 static command_result job_cmd(color_ostream &out, vector <string> & parameters)

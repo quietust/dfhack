@@ -47,7 +47,7 @@
 #include "df/tiletype_material.h"
 #include "df/tiletype_shape.h"
 #include "df/tiletype_shape_basic.h"
-#include "df/ui.h"
+#include "df/plotinfost.h"
 #include "df/unit.h"
 #include "df/unit_inventory_item.h"
 #include "df/world.h"
@@ -389,7 +389,7 @@ void findAndAssignInvasionJob(color_ostream& out, void* tickTime) {
         //find all locals and invaders
         for ( size_t a = 0; a < world->units.all.size(); a++ ) {
             df::unit* unit = world->units.all[a];
-            if ( unit->flags1.bits.dead )
+            if ( unit->flags1.bits.inactive )
                 continue;
             if ( Units::isCitizen(unit) ) {
                 if ( localPts.find(unit->pos) != localPts.end() )
@@ -598,7 +598,7 @@ void findAndAssignInvasionJob(color_ostream& out, void* tickTime) {
     lastInvasionDigger = firstInvader->id;
     lastInvasionJob = firstInvader->job.current_job ? firstInvader->job.current_job->id : -1;
     invaderJobs.erase(lastInvasionJob);
-    for ( df::job_list_link* link = &world->job_list; link != NULL; link = link->next ) {
+    for ( df::job_list_link* link = &world->jobs.list; link != NULL; link = link->next ) {
         if ( link->item == NULL )
             continue;
         df::job* job = link->item;

@@ -15,7 +15,7 @@
 #include "df/tile_dig_designation.h"
 #include "df/plant_raw.h"
 #include "df/plant.h"
-#include "df/ui.h"
+#include "df/plotinfost.h"
 #include "df/burrow.h"
 #include "df/item_flags.h"
 #include "df/item.h"
@@ -40,7 +40,7 @@ using namespace df::enums;
 #define PLUGIN_VERSION 0.3
 DFHACK_PLUGIN("autochop");
 REQUIRE_GLOBAL(world);
-REQUIRE_GLOBAL(ui);
+REQUIRE_GLOBAL(plotinfo);
 
 static bool autochop_enabled = false;
 static int min_logs, max_logs;
@@ -216,13 +216,13 @@ static int do_chop_designation(bool chop, bool count_only)
         int x = plant->pos.x % 16;
         int y = plant->pos.y % 16;
 
-        if (plant->flags.bits.is_shrub)
+        if (ENUM_ATTR(plant_type, is_shrub, df::plant_type(plant->type.value)))
             continue;
         if (cur->designation[x][y].bits.hidden)
             continue;
 
         df::tiletype_material material = tileMaterial(cur->tiletype[x][y]);
-        if (material != tiletype_material::TREE)
+        if (material != tiletype_material::PLANT)
             continue;
 
         if (!count_only && !watchedBurrows.isValidPos(plant->pos))
@@ -257,7 +257,7 @@ static int do_chop_designation(bool chop, bool count_only)
 
         if (dirty)
         {
-            cur->flags.bits.designated = true;
+            cur->flags.set(block_flags::Designated);
             ++count;
         }
     }
@@ -390,7 +390,7 @@ public:
         auto last_selected_index = burrows_column.highlighted_index;
         burrows_column.clear();
 
-        for (auto iter = ui->burrows.list.begin(); iter != ui->burrows.list.end(); iter++)
+        for (auto iter = plotinfo->burrows.list.begin(); iter != plotinfo->burrows.list.end(); iter++)
         {
             df::burrow* burrow = *iter;
             auto elem = ListEntry<df::burrow *>(burrow->name, burrow);
@@ -683,7 +683,7 @@ struct autochop_hook : public df::viewscreen_dwarfmodest
     bool isInDesignationMenu()
     {
         using namespace df::enums::ui_sidebar_mode;
-        return (ui->main.mode == DesignateChopTrees);
+        return (plotinfo->main.mode == DesignateChopTrees);
     }
 
     void sendKey(const df::interface_key &key)
@@ -714,7 +714,7 @@ struct autochop_hook : public df::viewscreen_dwarfmodest
         if (dims.menu_x1 <= 0)
             return;
 
-        df::ui_sidebar_mode d = ui->main.mode;
+        df::ui_sidebar_mode d = plotinfo->main.mode;
         if (!isInDesignationMenu())
             return;
 

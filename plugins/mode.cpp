@@ -56,9 +56,6 @@ void printCurrentModes(t_gamemodes gm, Console & con)
     case game_type::ADVENTURE_ARENA:
         con << "Arena - control creature)" << endl;
         break;
-    case game_type::num:
-        con << "INVALID)" << endl;
-        break;
     case game_type::NONE:
         con << "NONE)" << endl;
         break;
@@ -74,9 +71,6 @@ void printCurrentModes(t_gamemodes gm, Console & con)
         break;
     case game_mode::ADVENTURE:
         con << "Adventure)" << endl;
-        break;
-    case game_mode::num:
-        con << "INVALID)" << endl;
         break;
     case game_mode::NONE:
         con << "NONE)" << endl;

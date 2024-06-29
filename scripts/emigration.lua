@@ -60,10 +60,9 @@ function canLeave(unit)
         if skill.rating > 14 then return false end
     end
     if unit.flags1.caged
-        or unit.race ~= df.global.ui.race_id
-        or unit.civ_id ~= df.global.ui.civ_id
+        or unit.race ~= df.global.plotinfo.race_id
+        or unit.civ_id ~= df.global.plotinfo.civ_id
         or dfhack.units.isDead(unit)
-        or dfhack.units.isOpposedToLife(unit)
         or unit.flags1.merchant
         or unit.flags1.diplomat
         or unit.flags1.chained

@@ -17,7 +17,7 @@
 
 #include "DataDefs.h"
 #include <VTableInterpose.h>
-#include "df/ui.h"
+#include "df/plotinfost.h"
 #include "df/world.h"
 #include "df/squad.h"
 #include "df/unit.h"
@@ -53,12 +53,11 @@ using std::endl;
 using namespace DFHack;
 using namespace df::enums;
 
-using df::global::ui;
+using df::global::plotinfo;
 using df::global::world;
 using df::global::gamemode;
-using df::global::ui_build_selector;
+using df::global::buildreq;
 using df::global::ui_menu_width;
-using df::global::ui_area_map_width;
 
 using namespace DFHack::Gui;
 using Screen::Pen;
@@ -139,11 +138,11 @@ DFhackCExport command_result plugin_shutdown (color_ostream &out)
 // Check if the item is assigned to any use controlled by the military tab
 static bool is_assigned_item(df::item *item)
 {
-    if (!ui)
+    if (!plotinfo)
         return false;
 
     auto type = item->getType();
-    int idx = binsearch_index(ui->equipment.items_assigned[type], item->id);
+    int idx = binsearch_index(plotinfo->equipment.items_assigned[type], item->id);
     if (idx < 0)
         return false;
 
@@ -153,9 +152,9 @@ static bool is_assigned_item(df::item *item)
 // Check if this ammo item is assigned to this squad with one of the specified uses
 static bool is_squad_ammo(df::item *item, df::squad *squad, bool combat, bool train)
 {
-    for (size_t i = 0; i < squad->ammunition.size(); i++)
+    for (size_t i = 0; i < squad->ammo.ammunition.size(); i++)
     {
-        auto spec = squad->ammunition[i];
+        auto spec = squad->ammo.ammunition[i];
         bool cs = spec->flags.bits.use_combat;
         bool ts = spec->flags.bits.use_training;
 
@@ -270,14 +269,14 @@ static bool belongs_to_position(df::item *item, df::building *holder)
     {
         for (size_t i = 0; i < squad->positions.size(); i++)
         {
-            if (binsearch_index(squad->positions[i]->assigned_items, item->id) >= 0)
+            if (binsearch_index(squad->positions[i]->equipment.assigned_items, item->id) >= 0)
                 return true;
         }
     }
     else
     {
         auto cpos = vector_get(squad->positions, position);
-        if (cpos && binsearch_index(cpos->assigned_items, item->id) >= 0)
+        if (cpos && binsearch_index(cpos->equipment.assigned_items, item->id) >= 0)
             return true;
     }
 
@@ -374,7 +373,7 @@ template<class Item> struct armory_hook : Item {
      * The logical place for this code is in the loop that processes
      * that vector, but that part is not virtual.
      */
-    DEFINE_VMETHOD_INTERPOSE(bool, moveToGround, (int16_t x, int16_t y, int16_t z))
+    DEFINE_VMETHOD_INTERPOSE(bool, moveToGround, (int32_t x, int32_t y, int32_t z))
     {
         // First, let it do its work
         bool rv = INTERPOSE_NEXT(moveToGround)(x, y, z);
@@ -502,11 +501,11 @@ static bool try_store_item(df::building *target, df::item *item)
             job->job_type = job_type::StoreWeapon;
             // Without this flag dwarves will pick up the item, and
             // then dismiss the job and put it back into the stockpile:
-            job->flags.bits.specific_dropoff = true;
+            //job->flags.bits.specific_dropoff = true;
             break;
         case building_type::Armorstand:
             job->job_type = job_type::StoreArmor;
-            job->flags.bits.specific_dropoff = true;
+            //job->flags.bits.specific_dropoff = true;
             break;
         case building_type::Cabinet:
             job->job_type = job_type::StoreOwnedItem;
@@ -659,9 +658,9 @@ static void try_store_ammo(df::squad *squad)
     bool indexed = false;
     ammo_box_set train_set, combat_set;
 
-    for (size_t i = 0; i < squad->ammunition.size(); i++)
+    for (size_t i = 0; i < squad->ammo.ammunition.size(); i++)
     {
-        auto spec = squad->ammunition[i];
+        auto spec = squad->ammo.ammunition[i];
         bool cs = spec->flags.bits.use_combat;
         bool ts = spec->flags.bits.use_training;
 
@@ -720,7 +719,7 @@ DFhackCExport command_result plugin_onupdate(color_ostream &out, state_change_ev
         {
             auto pos = squad->positions[i];
 
-            try_store_item_set(pos->assigned_items, squad, pos);
+            try_store_item_set(pos->equipment.assigned_items, squad, pos);
         }
 
         try_store_ammo(squad);

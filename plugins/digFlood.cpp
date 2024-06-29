@@ -89,7 +89,7 @@ void onDig(color_ostream& out, void* ptr) {
         return;
 
     set<df::coord> jobLocations;
-    for ( df::job_list_link* link = &world->job_list; link != NULL; link = link->next ) {
+    for ( df::job_list_link* link = &world->jobs.list; link != NULL; link = link->next ) {
         if ( link->item == NULL )
             continue;
 
@@ -147,14 +147,14 @@ void maybeExplore(color_ostream& out, MapExtras::MapCache& cache, df::coord pt, 
     if ( mat == -1 )
         return;
     if ( !digAll ) {
-        df::inorganic_raw* inorganic = world->raws.inorganics[mat];
+        df::inorganic_raw* inorganic = world->raws.inorganics.all[mat];
         if ( autodigMaterials.find(inorganic->id) == autodigMaterials.end() ) {
             return;
         }
     }
 
     block->designation[pt.x&0xF][pt.y&0xF].bits.dig = df::enums::tile_dig_designation::Default;
-    block->flags.bits.designated = true;
+    block->flags.set(block_flags::Designated);
 //    *process_dig  = true;
 //    *process_jobs = true;
 }
@@ -189,8 +189,8 @@ command_result digFlood (color_ostream &out, std::vector <std::string> & paramet
             continue;
         }
 
-        for ( size_t b = 0; b < world->raws.inorganics.size(); b++ ) {
-            df::inorganic_raw* inorganic = world->raws.inorganics[b];
+        for ( size_t b = 0; b < world->raws.inorganics.all.size(); b++ ) {
+            df::inorganic_raw* inorganic = world->raws.inorganics.all[b];
             if ( parameters[a] == inorganic->id ) {
                 if ( adding )
                     toAdd.insert(parameters[a]);

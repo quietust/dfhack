@@ -105,8 +105,8 @@ if (NOT EXISTS ${dfhack_SOURCE_DIR}/library/xml/codegen.pl OR NOT EXISTS ${dfhac
 endif()
 
 # set up versioning.
-set(DF_VERSION "0.43.03")
-SET(DFHACK_RELEASE "r1")
+set(DF_VERSION "0.31.25")
+SET(DFHACK_RELEASE "r10")
 SET(DFHACK_PRERELEASE FALSE)
 
 set(DFHACK_VERSION "${DF_VERSION}-${DFHACK_RELEASE}")
@@ -206,11 +206,6 @@ include_directories(depends/tthread)
 include_directories(${ZLIB_INCLUDE_DIRS})
 include_directories(depends/clsocket/src)
 add_subdirectory(depends)
-
-find_package(Git REQUIRED)
-if(NOT GIT_FOUND)
-    message(SEND_ERROR "could not find git")
-endif()
 
 # build the lib itself
 IF(BUILD_LIBRARY)

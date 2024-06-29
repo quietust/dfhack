@@ -6,8 +6,8 @@ using namespace std;
 using namespace DFHack;
 using namespace df::enums;
 
-using df::global::ui;
-using df::global::ui_build_selector;
+using df::global::plotinfo;
+using df::global::buildreq;
 using df::global::ui_menu_width;
 
 static df::coord last_view, last_cursor;
@@ -18,14 +18,14 @@ struct stable_cursor_hook : df::viewscreen_dwarfmodest
 
     bool check_default()
     {
-        switch (ui->main.mode) {
+        switch (plotinfo->main.mode) {
             case ui_sidebar_mode::Default:
                 return true;
 
             case ui_sidebar_mode::Build:
-                return ui_build_selector &&
-                       (ui_build_selector->building_type < 0 ||
-                        ui_build_selector->stage < 1);
+                return buildreq &&
+                       (buildreq->building_type < 0 ||
+                        buildreq->stage < 1);
 
             default:
                 return false;

@@ -122,7 +122,7 @@ build_filter.HUMANish={
 
 --economic stone fix: just disable all of them
 --[[ FIXME: maybe let player select which to disable?]]
-for k,v in ipairs(df.global.ui.economic_stone) do df.global.ui.economic_stone[k]=0 end
+for k,v in ipairs(df.global.plotinfo.economic_stone) do df.global.plotinfo.economic_stone[k]=0 end
 
 local gui = require 'gui'
 local wid=require 'gui.widgets'
@@ -1435,7 +1435,7 @@ end
 --no reset here means that the button opens submenu
 function usetool:openShopWindowButtoned(building,no_reset)
     self:setupFields()
-    local wui=df.global.ui_sidebar_menus.workshop_job
+    local wui=df.global.game.workshop_job
     if not no_reset then
         -- [[ manual reset incase the df-one does not exist?
         wui:assign{category_id=-1,mat_type=-1,mat_index=-1}

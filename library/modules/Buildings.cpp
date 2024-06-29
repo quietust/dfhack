@@ -61,7 +61,6 @@ using namespace DFHack;
 #include "df/building_furnacest.h"
 #include "df/building_grate_floorst.h"
 #include "df/building_grate_wallst.h"
-#include "df/building_rollersst.h"
 #include "df/building_screw_pumpst.h"
 #include "df/building_stockpilest.h"
 #include "df/building_trapst.h"
@@ -74,13 +73,14 @@ using namespace DFHack;
 #include "df/item.h"
 #include "df/job.h"
 #include "df/job_item.h"
-#include "df/ui.h"
-#include "df/ui_look_list.h"
+#include "df/plotinfost.h"
+#include "df/lookinfost.h"
 #include "df/unit.h"
+#include "df/unit_relationship_type.h"
 #include "df/world.h"
 
 using namespace df::enums;
-using df::global::ui;
+using df::global::plotinfo;
 using df::global::world;
 using df::global::d_init;
 using df::global::building_next_id;
@@ -95,7 +95,7 @@ struct CoordHash {
 
 static unordered_map<df::coord, int32_t, CoordHash> locationToBuilding;
 
-static uint8_t *getExtentTile(df::building_extents &extent, df::coord2d tile)
+static df::building_extents_type *getExtentTile(df::building_extents &extent, df::coord2d tile)
 {
     if (!extent.extents)
         return NULL;
@@ -131,13 +131,13 @@ void buildings_onUpdate(color_ostream &out)
 {
     buildings_do_onupdate = false;
 
-    df::job_list_link *link = world->job_list.next;
+    df::job_list_link *link = world->jobs.list.next;
     for (; link; link = link->next) {
         df::job *job = link->item;
 
         if (job->job_type != job_type::ConstructBuilding)
             continue;
-        if (job->job_items.empty())
+        if (job->job_items.elements.empty())
             continue;
 
         buildings_do_onupdate = true;
@@ -147,7 +147,7 @@ void buildings_onUpdate(color_ostream &out)
             df::job_item_ref *iref = job->items[i];
             if (iref->role != df::job_item_ref::Reagent)
                 continue;
-            df::job_item *item = vector_get(job->job_items, iref->job_item_idx);
+            df::job_item *item = vector_get(job->job_items.elements, iref->job_item_idx);
             if (!item)
                 continue;
             // Convert Reagent to Hauled, while decrementing quantity
@@ -165,7 +165,6 @@ uint32_t Buildings::getNumBuildings()
 
 bool Buildings::Read (const uint32_t index, t_building & building)
 {
-    Core & c = Core::getInstance();
     df::building *bld = world->buildings.all[index];
 
     building.x1 = bld->x1;
@@ -224,7 +223,7 @@ bool Buildings::setOwner(df::building *bld, df::unit *unit)
         auto &blist = bld->owner->owned_buildings;
         vector_erase_at(blist, linear_index(blist, bld));
 
-        if (auto spouse = df::unit::find(bld->owner->relations.spouse_id))
+        if (auto spouse = df::unit::find(bld->owner->relationship_ids[df::unit_relationship_type::Spouse]))
         {
             auto &blist = spouse->owned_buildings;
             vector_erase_at(blist, linear_index(blist, bld));
@@ -237,7 +236,7 @@ bool Buildings::setOwner(df::building *bld, df::unit *unit)
     {
         unit->owned_buildings.push_back(bld);
 
-        if (auto spouse = df::unit::find(unit->relations.spouse_id))
+        if (auto spouse = df::unit::find(unit->relationship_ids[df::unit_relationship_type::Spouse]))
         {
             auto &blist = spouse->owned_buildings;
             if (bld->canUseSpouseRoom() && linear_index(blist, bld) < 0)
@@ -337,7 +336,7 @@ df::building *Buildings::allocInstance(df::coord pos, df::building_type type, in
     bld->y1 = bld->y2 = bld->centery = pos.y;
     bld->z = pos.z;
 
-    bld->race = ui->race_id;
+    bld->race = plotinfo->race_id;
 
     if (subtype != -1)
         bld->setSubtype(subtype);
@@ -460,10 +459,6 @@ bool Buildings::getCorrectSize(df::coord2d &size, df::coord2d &center,
         makeOneDim(size, center, direction);
         return true;
 
-    case Rollers:
-        makeOneDim(size, center, (direction&1) == 0);
-        return true;
-
     case WaterWheel:
         size = df::coord2d(3,3);
         makeOneDim(size, center, direction);
@@ -570,7 +565,7 @@ bool Buildings::checkFreeTiles(df::coord pos, df::coord2d size,
         for (int dy = 0; dy < size.y; dy++)
         {
             df::coord tile = pos + df::coord(dx,dy,0);
-            uint8_t *etile = NULL;
+            df::building_extents_type *etile = NULL;
 
             // Exclude using extents
             if (ext && ext->extents)
@@ -610,7 +605,7 @@ bool Buildings::checkFreeTiles(df::coord pos, df::coord2d size,
 
                 if (!ext->extents)
                 {
-                    ext->extents = new uint8_t[size.x*size.y];
+                    ext->extents = new df::building_extents_type[size.x*size.y];
                     ext->x = pos.x;
                     ext->y = pos.y;
                     ext->width = size.x;
@@ -623,7 +618,7 @@ bool Buildings::checkFreeTiles(df::coord pos, df::coord2d size,
                 if (!etile)
                     return false;
 
-                *etile = 0;
+                *etile = df::building_extents_type::None;
             }
         }
     }
@@ -678,8 +673,8 @@ bool Buildings::containsTile(df::building *bld, df::coord2d tile, bool room)
 
     if (bld->room.extents && (room || bld->isExtentShaped()))
     {
-        uint8_t *etile = getExtentTile(bld->room, tile);
-        if (!etile || !*etile)
+        df::building_extents_type *etile = getExtentTile(bld->room, tile);
+        if (!etile || *etile == df::building_extents_type::None)
             return false;
     }
 
@@ -767,12 +762,6 @@ bool Buildings::setSize(df::building *bld, df::coord2d size, int direction)
             obj->direction = (df::screw_pump_direction)direction;
             break;
         }
-    case Rollers:
-        {
-            auto obj = (df::building_rollersst*)bld;
-            obj->direction = (df::screw_pump_direction)direction;
-            break;
-        }
     case Bridge:
         {
             auto obj = (df::building_bridgest*)bld;
@@ -810,7 +799,7 @@ static void markBuildingTiles(df::building *bld, bool remove)
 
             if (use_extents)
             {
-                uint8_t *etile = getExtentTile(bld->room, tile);
+                df::building_extents_type *etile = getExtentTile(bld->room, tile);
                 if (!etile || !*etile)
                     continue;
             }
@@ -848,10 +837,10 @@ static void linkRooms(df::building *bld)
     for (size_t i = 0; i < vec.size(); i++)
     {
         auto room = vec[i];
-        if (!room->is_room || room->z != bld->z)
+        if (!room->is_room || room->z != bld->z || room == bld)
             continue;
 
-        uint8_t *pext = getExtentTile(room->room, df::coord2d(bld->x1, bld->y1));
+        df::building_extents_type *pext = getExtentTile(room->room, df::coord2d(bld->x1, bld->y1));
         if (!pext || !*pext)
             continue;
 
@@ -863,7 +852,7 @@ static void linkRooms(df::building *bld)
     }
 
     if (changed)
-        df::global::ui->equipment.update.bits.buildings = true;
+        df::global::plotinfo->equipment.update.bits.buildings = true;
 }
 
 static void unlinkRooms(df::building *bld)
@@ -1086,7 +1075,7 @@ bool Buildings::constructWithFilters(df::building *bld, std::vector<df::job_item
          * order, but processes filters straight. This reverses
          * the order of filters so as to produce the same final
          * contained_items ordering as the normal ui way. */
-        vector_insert_at(job->job_items, 0, items[i]);
+        vector_insert_at(job->job_items.elements, 0, items[i]);
 
         if (items[i]->item_type == item_type::BOULDER)
             rough = true;
@@ -1104,7 +1093,7 @@ bool Buildings::constructWithFilters(df::building *bld, std::vector<df::job_item
 
 bool Buildings::deconstruct(df::building *bld)
 {
-    using df::global::ui;
+    using df::global::plotinfo;
     using df::global::world;
     using df::global::ui_look_list;
 
@@ -1129,7 +1118,8 @@ bool Buildings::deconstruct(df::building *bld)
     // Assume: no parties.
     unlinkRooms(bld);
     // Assume: not unit destroy target
-    vector_erase_at(ui->tax_collection.rooms, linear_index(ui->tax_collection.rooms, bld->id));
+    int id = bld->id;
+    vector_erase_at(plotinfo->tax_collection.rooms, linear_index(plotinfo->tax_collection.rooms, id));
     // Assume: not used in punishment
     // Assume: not used in non-own jobs
     // Assume: does not affect pathfinding
@@ -1145,13 +1135,13 @@ bool Buildings::deconstruct(df::building *bld)
         world->update_selected_building = true;
     }
 
-    for (int i = ui_look_list->items.size()-1; i >= 0; i--)
+    for (int i = ui_look_list->size()-1; i >= 0; --i)
     {
-        auto item = ui_look_list->items[i];
-        if (item->type == df::ui_look_list::T_items::Building &&
+        auto item = (*ui_look_list)[i];
+        if (item->type == df::lookinfost::T_type::Building &&
             item->building == bld)
         {
-            vector_erase_at(ui_look_list->items, i);
+            vector_erase_at(*ui_look_list, i);
             delete item;
         }
     }

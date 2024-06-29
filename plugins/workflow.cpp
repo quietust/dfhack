@@ -15,7 +15,7 @@
 
 #include "DataDefs.h"
 #include "df/world.h"
-#include "df/ui.h"
+#include "df/plotinfost.h"
 #include "df/building_workshopst.h"
 #include "df/building_furnacest.h"
 #include "df/job.h"
@@ -40,7 +40,6 @@
 #include "df/plant_raw.h"
 #include "df/inorganic_raw.h"
 #include "df/builtin_mats.h"
-#include "df/vehicle.h"
 
 using std::vector;
 using std::string;
@@ -52,23 +51,20 @@ using namespace df::enums;
 DFHACK_PLUGIN("workflow");
 
 REQUIRE_GLOBAL(world);
-REQUIRE_GLOBAL(ui);
+REQUIRE_GLOBAL(plotinfo);
 REQUIRE_GLOBAL(ui_workshop_job_cursor);
 REQUIRE_GLOBAL(job_next_id);
 
 /* Plugin registration */
 
 static command_result workflow_cmd(color_ostream &out, vector <string> & parameters);
-static command_result fix_job_postings_cmd(color_ostream &out, vector<string> &parameters);
 
 static void init_state(color_ostream &out);
 static void cleanup_state(color_ostream &out);
 
-static int fix_job_postings(color_ostream *out = NULL, bool dry_run = false);
-
 DFhackCExport command_result plugin_init (color_ostream &out, std::vector <PluginCommand> &commands)
 {
-    if (!world || !ui)
+    if (!world || !plotinfo)
         return CR_FAILURE;
 
     if (ui_workshop_job_cursor && job_next_id) {
@@ -145,13 +141,6 @@ DFhackCExport command_result plugin_init (color_ostream &out, std::vector <Plugi
                 "    Maintain 10-100 locally-made crafts of exceptional quality.\n"
             )
         );
-        commands.push_back(PluginCommand(
-            "fix-job-postings",
-            "Fix broken job postings caused by certain versions of workflow",
-            fix_job_postings_cmd, false,
-            "fix-job-postings: Fix job postings\n"
-            "fix-job-postings dry|[any argument]: Dry run only (avoid making changes)\n"
-        ));
     }
 
     init_state(out);
@@ -180,14 +169,6 @@ DFhackCExport command_result plugin_onstatechange(color_ostream &out, state_chan
         break;
     }
 
-    return CR_OK;
-}
-
-command_result fix_job_postings_cmd(color_ostream &out, vector<string> &parameters)
-{
-    bool dry = parameters.size();
-    int fixed = fix_job_postings(&out, dry);
-    out << fixed << " job issue(s) " << (dry ? "detected but not fixed" : "fixed") << endl;
     return CR_OK;
 }
 
@@ -292,7 +273,6 @@ public:
         {
             if (world->frame_counter >= resume_time && actual_job->flags.bits.suspend)
             {
-                Job::removePostings(actual_job, true);
                 actual_job->flags.bits.suspend = false;
             }
         }
@@ -305,7 +285,6 @@ public:
             if (!actual_job->flags.bits.suspend)
             {
                 actual_job->flags.bits.suspend = true;
-                Job::removePostings(actual_job, true);
             }
         }
 
@@ -424,34 +403,6 @@ public:
     }
 };
 
-static int fix_job_postings (color_ostream *out, bool dry_run)
-{
-    int count = 0;
-    df::job_list_link *link = &world->job_list;
-    while (link)
-    {
-        df::job *job = link->item;
-        if (job)
-        {
-            for (size_t i = 0; i < world->job_postings.size(); ++i)
-            {
-                df::world::T_job_postings *posting = world->job_postings[i];
-                if (posting->job == job && i != job->posting_index && !posting->flags.bits.dead)
-                {
-                    ++count;
-                    if (out)
-                        *out << "Found extra job posting: Job " << job->id << ": "
-                            << Job::getName(job) << endl;
-                    if (!dry_run)
-                        posting->flags.bits.dead = true;
-                }
-            }
-        }
-        link = link->next;
-    }
-    return count;
-}
-
 /******************************
  *      GLOBAL VARIABLES      *
  ******************************/
@@ -492,7 +443,7 @@ static bool isSupportedJob(df::job *job)
 {
     return job->specific_refs.empty() &&
            Job::getHolder(job) &&
-           (!job->job_items.empty() ||
+           (!job->job_items.elements.empty() ||
             job->job_type == job_type::CollectClay ||
             job->job_type == job_type::CollectSand ||
             job->job_type == job_type::MilkCreature ||
@@ -548,11 +499,6 @@ static ItemConstraint *get_constraint(color_ostream &out, const std::string &str
 
 static void start_protect(color_ostream &out)
 {
-    out << "workflow: checking for existing job issues" << endl;
-    int count = fix_job_postings(&out);
-    if (count)
-        out << "workflow: fixed " << count << " job issues" << endl;
-
     check_lost_jobs(out, 0);
 
     if (!known_jobs.empty())
@@ -671,7 +617,7 @@ static void check_lost_jobs(color_ostream &out, int ticks)
     ProtectedJob::cur_tick_idx++;
     if (ticks < 0) ticks = 0;
 
-    df::job_list_link *p = world->job_list.next;
+    df::job_list_link *p = world->jobs.list.next;
     for (; p; p = p->next)
     {
         df::job *job = p->item;
@@ -705,7 +651,7 @@ static void check_lost_jobs(color_ostream &out, int ticks)
 
 static void update_job_data(color_ostream &out)
 {
-    df::job_list_link *p = world->job_list.next;
+    df::job_list_link *p = world->jobs.list.next;
     for (; p; p = p->next)
     {
         ProtectedJob *pj = get_known(p->item->id);
@@ -1007,13 +953,13 @@ static void guess_job_material(df::job *job, MaterialInfo &mat, df::dfhack_mater
     }
 
     // Material from the job reagent
-    if (!mat.isValid() && !job->job_items.empty() &&
-        (job->job_items.size() == 1 ||
-         job->job_items[0]->item_type == item_type::PLANT))
+    if (!mat.isValid() && !job->job_items.elements.empty() &&
+        (job->job_items.elements.size() == 1 ||
+         job->job_items.elements[0]->item_type == item_type::PLANT))
     {
-        mat.decode(job->job_items[0]);
+        mat.decode(job->job_items.elements[0]);
 
-        switch (job->job_items[0]->item_type)
+        switch (job->job_items.elements[0]->item_type)
         {
         case item_type::WOOD:
             mat_mask.bits.wood = mat_mask.bits.wood2 = true;
@@ -1150,25 +1096,16 @@ static bool itemInRealJob(df::item *item)
         return false;
 
     auto ref = Items::getSpecificRef(item, specific_ref_type::JOB);
-    if (!ref || !ref->job)
+    if (!ref || !ref->data.job)
         return true;
 
-    return ENUM_ATTR(job_type, type, ref->job->job_type)
+    return ENUM_ATTR(job_type, type, ref->data.job->job_type)
                != job_type_class::Hauling;
-}
-
-static bool isRouteVehicle(df::item *item)
-{
-    int id = item->getVehicleID();
-    if (id < 0) return false;
-
-    auto vehicle = df::vehicle::find(id);
-    return vehicle && vehicle->route_id >= 0;
 }
 
 static bool isAssignedSquad(df::item *item)
 {
-    auto &vec = ui->equipment.items_assigned[item->getType()];
+    auto &vec = plotinfo->equipment.items_assigned[item->getType()];
     return binsearch_index(vec, &df::item::id, item->id) >= 0;
 }
 
@@ -1286,7 +1223,6 @@ static void map_job_items(color_ostream &out)
                 item->flags.bits.owned ||
                 item->flags.bits.in_chest ||
                 item->isAssignedToStockpile() ||
-                isRouteVehicle(item) ||
                 itemInRealJob(item) ||
                 itemBusy(item) ||
                 isAssignedSquad(item))
@@ -1654,13 +1590,6 @@ static int getCountHistory(lua_State *L)
     return 1;
 }
 
-static int fixJobPostings(lua_State *L)
-{
-    bool dry = lua_toboolean(L, 1);
-    lua_pushinteger(L, fix_job_postings(NULL, dry));
-    return 1;
-}
-
 DFHACK_PLUGIN_LUA_FUNCTIONS {
     DFHACK_LUA_FUNCTION(deleteConstraint),
     DFHACK_LUA_END
@@ -1671,7 +1600,6 @@ DFHACK_PLUGIN_LUA_COMMANDS {
     DFHACK_LUA_COMMAND(findConstraint),
     DFHACK_LUA_COMMAND(setConstraint),
     DFHACK_LUA_COMMAND(getCountHistory),
-    DFHACK_LUA_COMMAND(fixJobPostings),
     DFHACK_LUA_END
 };
 
@@ -1825,7 +1753,7 @@ static command_result workflow_cmd(color_ostream &out, vector <string> & paramet
     //df::job *job = NULL;
 
     if (Gui::dwarfmode_hotkey(Core::getTopViewscreen()) &&
-        ui->main.mode == ui_sidebar_mode::QueryBuilding)
+        plotinfo->main.mode == ui_sidebar_mode::QueryBuilding)
     {
         workshop = world->selected_building;
         //job = Gui::getSelectedWorkshopJob(out, true);

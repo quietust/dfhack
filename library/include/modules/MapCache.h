@@ -37,6 +37,7 @@ distribution.
 #include "df/construction.h"
 #include "df/item.h"
 #include "df/inclusion_type.h"
+#include "df/block_flags.h"
 
 using namespace DFHack;
 
@@ -272,7 +273,7 @@ public:
         //printf("setting block %d/%d/%d , %d %d\n",x,y,z, p.x, p.y);
         index_tile<df::tile_designation&>(designation,p) = des;
         if(des.bits.dig && block)
-            block->flags.bits.designated = true;
+            block->flags.set(df::block_flags::Designated);
         return true;
     }
 
@@ -305,7 +306,7 @@ public:
 
     t_blockflags BlockFlags()
     {
-        return block ? block->flags : t_blockflags();
+        return block ? t_blockflags(block->flags.bits[0]) : t_blockflags();
     }
 
     bool Write();

@@ -73,11 +73,6 @@ cost_t getEdgeCost(color_ostream& out, df::coord pt1, df::coord pt2, DigAbilitie
         return -1;
     }
 
-    if ( shape2 == df::enums::tiletype_shape::BRANCH ||
-         shape2 == df::enums::tiletype_shape::TRUNK_BRANCH ||
-         shape2 == df::enums::tiletype_shape::TWIG )
-        return -1;
-
 /*
     if () {
         df::map_block* temp = Maps::getTileBlock(df::coord(pt1.x,pt1.y,pt1.z-1));

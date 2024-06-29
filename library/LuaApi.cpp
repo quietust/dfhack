@@ -69,7 +69,6 @@ distribution.
 #include "df/item.h"
 #include "df/material.h"
 #include "df/viewscreen.h"
-#include "df/identity.h"
 #include "df/nemesis_record.h"
 #include "df/historical_figure.h"
 #include "df/historical_entity.h"
@@ -1415,13 +1414,6 @@ static const LuaWrapper::FunctionReg dfhack_module[] = {
     WRAP_VERSION_FUNC(getDFHackVersion, dfhack_version),
     WRAP_VERSION_FUNC(getDFHackRelease, dfhack_release),
     WRAP_VERSION_FUNC(getCompiledDFVersion, df_version),
-    WRAP_VERSION_FUNC(getGitDescription, git_description),
-    WRAP_VERSION_FUNC(getGitCommit, git_commit),
-    WRAP_VERSION_FUNC(getGitXmlCommit, git_xml_commit),
-    WRAP_VERSION_FUNC(getGitXmlExpectedCommit, git_xml_expected_commit),
-    WRAP_VERSION_FUNC(gitXmlMatch, git_xml_match),
-    WRAP_VERSION_FUNC(isRelease, is_release),
-    WRAP_VERSION_FUNC(isPrerelease, is_prerelease),
     { NULL, NULL }
 };
 
@@ -1468,7 +1460,6 @@ static const LuaWrapper::FunctionReg dfhack_job_module[] = {
     WRAPM(Job,isSuitableMaterial),
     WRAPM(Job,getName),
     WRAPM(Job,linkIntoWorld),
-    WRAPM(Job,removePostings),
     WRAPN(is_equal, jobEqual),
     WRAPN(is_item_equal, jobItemEqual),
     { NULL, NULL }
@@ -1504,15 +1495,10 @@ static const LuaWrapper::FunctionReg dfhack_units_module[] = {
     WRAPM(Units, getContainer),
     WRAPM(Units, setNickname),
     WRAPM(Units, getVisibleName),
-    WRAPM(Units, getIdentity),
     WRAPM(Units, getNemesis),
-    WRAPM(Units, isHidingCurse),
     WRAPM(Units, getPhysicalAttrValue),
     WRAPM(Units, getMentalAttrValue),
-    WRAPM(Units, isCrazed),
-    WRAPM(Units, isOpposedToLife),
     WRAPM(Units, hasExtravision),
-    WRAPM(Units, isBloodsucker),
     WRAPM(Units, isMischievous),
     WRAPM(Units, getMiscTrait),
     WRAPM(Units, isDead),
@@ -1559,10 +1545,8 @@ static const LuaWrapper::FunctionReg dfhack_units_module[] = {
     WRAPM(Units, isMarkedForSlaughter),
     WRAPM(Units, isTame),
     WRAPM(Units, isTrained),
-    WRAPM(Units, isGay),
     WRAPM(Units, isNaked),
     WRAPM(Units, isUndead),
-    WRAPM(Units, isGelded),
     WRAPM(Units, isDomesticated),
     { NULL, NULL }
 };
@@ -1680,7 +1664,7 @@ static int items_moveToBuilding(lua_State *state)
     MapExtras::MapCache mc;
     auto item = Lua::CheckDFObject<df::item>(state, 1);
     auto building = Lua::CheckDFObject<df::building_actual>(state, 2);
-    int use_mode = luaL_optint(state, 3, 0);
+    auto use_mode = (df::building_item_role_type)luaL_optint(state, 3, 0);
     bool force_in_building = lua_toboolean(state, 4);
     lua_pushboolean(state, Items::moveToBuilding(mc, item, building, use_mode, force_in_building));
     return 1;

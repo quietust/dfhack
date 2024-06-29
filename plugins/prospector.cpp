@@ -179,7 +179,7 @@ void printVeins(color_ostream &con, MatMap &mat_map,
 
     for (MatMap::const_iterator it = mat_map.begin(); it != mat_map.end(); ++it)
     {
-        df::inorganic_raw *gloss = world->raws.inorganics[it->first];
+        df::inorganic_raw *gloss = world->raws.inorganics.all[it->first];
 
         if (gloss->material.isGem())
             gems[it->first] = it->second;
@@ -190,13 +190,13 @@ void printVeins(color_ostream &con, MatMap &mat_map,
     }
 
     con << "Ores:" << std::endl;
-    printMats<df::inorganic_raw, std::greater>(con, ores, world->raws.inorganics, show_value);
+    printMats<df::inorganic_raw, std::greater>(con, ores, world->raws.inorganics.all, show_value);
 
     con << "Gems:" << std::endl;
-    printMats<df::inorganic_raw, std::greater>(con, gems, world->raws.inorganics, show_value);
+    printMats<df::inorganic_raw, std::greater>(con, gems, world->raws.inorganics.all, show_value);
 
     con << "Other vein stone:" << std::endl;
-    printMats<df::inorganic_raw, std::greater>(con, rest, world->raws.inorganics, show_value);
+    printMats<df::inorganic_raw, std::greater>(con, rest, world->raws.inorganics.all, show_value);
 }
 
 command_result prospector (color_ostream &out, vector <string> & parameters);
@@ -244,8 +244,8 @@ struct EmbarkTileLayout {
 
 static df::world_region_details *get_details(df::world_data *data, df::coord2d pos)
 {
-    int d_idx = linear_index(data->region_details, &df::world_region_details::pos, pos);
-    return vector_get(data->region_details, d_idx);
+    int d_idx = linear_index(data->midmap_data.region_details, &df::world_region_details::pos, pos);
+    return vector_get(data->midmap_data.region_details, d_idx);
 }
 
 bool estimate_underground(color_ostream &out, EmbarkTileLayout &tile, df::world_region_details *details, int x, int y)
@@ -279,11 +279,11 @@ bool estimate_underground(color_ostream &out, EmbarkTileLayout &tile, df::world_
             if (tile.elevation == 99)
                 tile.elevation = 98;
 
-            if (tile.geo_biome && (tile.geo_biome->unk1 == 4 || tile.geo_biome->unk1 == 5))
+            if (tile.geo_biome && (tile.geo_biome->type == geo_biome_type::OCEAN_SHALLOW_STANDARD || tile.geo_biome->type == geo_biome_type::OCEAN_SHALLOW_VOLCANIC))
             {
                 auto b_details = get_details(data, tile.biome_pos);
 
-                if (b_details && b_details->unk12e8 < 500)
+                if (b_details && b_details->ocean_beach_comp.soil_freq < 500)
                     tile.max_soil_depth = 0;
             }
         }
@@ -309,16 +309,16 @@ bool estimate_underground(color_ostream &out, EmbarkTileLayout &tile, df::world_
 
         float penalty = 1.0f;
         switch (layer->type) {
-        case df::world_underground_region::Cavern:
+        case df::feature_layer_type::SUBTERRANEAN:
             penalty = 0.75f;
             break;
-        case df::world_underground_region::MagmaSea:
+        case df::feature_layer_type::MAGMA_CORE:
             sea_found = true;
             tile.min_z = feature->min_z;
             for (int i = feature->min_z; i <= feature->max_z; i++)
                 tile.penalty[i] = 0.2 + 0.6f*(i-feature->min_z)/(feature->max_z-feature->min_z+1);
             break;
-        case df::world_underground_region::Underworld:
+        case df::feature_layer_type::UNDERWORLD:
             penalty = 0.0f;
             break;
         }
@@ -439,14 +439,13 @@ bool estimate_materials(color_ostream &out, EmbarkTileLayout &tile, MatMap &laye
 
         for (unsigned j = 0; j < layer->vein_mat.size(); j++)
             if (is_valid_enum_item<df::inclusion_type>(layer->vein_type[j]))
-                sums[layer->vein_type[j]] += layer->vein_unk_38[j];
+                sums[layer->vein_type[j]] += layer->vein_freq[j];
 
         for (unsigned j = 0; j < layer->vein_mat.size(); j++)
         {
             // TODO: find out how to estimate the real density
-            // this code assumes that vein_unk_38 is the weight
             // used when choosing the vein material
-            float size = float(layer->vein_unk_38[j]);
+            float size = float(layer->vein_freq[j]);
             df::inclusion_type type = layer->vein_type[j];
 
             switch (type)
@@ -530,7 +529,7 @@ static command_result embark_prospector(color_ostream &out, df::viewscreen_choos
 
     // Print the report
     out << "Layer materials:" << std::endl;
-    printMats<df::inorganic_raw, shallower>(out, layerMats, world->raws.inorganics, showValue);
+    printMats<df::inorganic_raw, shallower>(out, layerMats, world->raws.inorganics.all, showValue);
 
     if (showHidden) {
         DFHack::Materials *mats = Core::getInstance().getMaterials();
@@ -721,7 +720,7 @@ command_result prospector (color_ostream &con, vector <string> & parameters)
                             }
 
                             if (showSlade && blockFeatureGlobal.type != -1 && des.bits.feature_global
-                                    && blockFeatureGlobal.type == feature_type::feature_underworld_from_layer
+                                    && blockFeatureGlobal.type == feature_type::underworld_from_layer
                                     && blockFeatureGlobal.main_material == 0) // stone
                             {
                                 layerMats[blockFeatureGlobal.sub_material].add(global_z);
@@ -740,7 +739,7 @@ command_result prospector (color_ostream &con, vector <string> & parameters)
                 // and we can check visibility more easily here
                 if (showPlants)
                 {
-                    auto block = Maps::getBlockColumn(b_x,b_y);
+                    auto block = Maps::getBlock(b_x,b_y,z);
                     vector<df::plant *> *plants = block ? &block->plants : NULL;
                     if(plants)
                     {
@@ -753,7 +752,7 @@ command_result prospector (color_ostream &con, vector <string> & parameters)
                             loc = loc % 16;
                             if (showHidden || !b->DesignationAt(loc).bits.hidden)
                             {
-                                if(plant.flags.bits.is_shrub)
+                                if(ENUM_ATTR(plant_type, is_shrub, df::plant_type(plant.type.value)))
                                     plantMats[plant.material].add(global_z);
                                 else
                                     treeMats[plant.material].add(global_z);
@@ -793,7 +792,7 @@ command_result prospector (color_ostream &con, vector <string> & parameters)
     }
 
     con << std::endl << "Layer materials:" << std::endl;
-    printMats<df::inorganic_raw, shallower>(con, layerMats, world->raws.inorganics, showValue);
+    printMats<df::inorganic_raw, shallower>(con, layerMats, world->raws.inorganics.all, showValue);
 
     printVeins(con, veinMats, mats, showValue);
 

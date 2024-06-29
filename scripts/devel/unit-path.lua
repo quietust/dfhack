@@ -25,7 +25,7 @@ UnitPathUI.ATTRS {
 }
 
 function UnitPathUI:init()
-    self.saved_mode = df.global.ui.main.mode
+    self.saved_mode = df.global.plotinfo.main.mode
     if self.unit then
         self.has_path = #self.unit.path.path.x > 0
         self.has_goal = self.unit.path.dest.x >= 0
@@ -34,12 +34,12 @@ end
 
 function UnitPathUI:onShow()
     -- with cursor, but without those ugly lines from native hauling mode
-    df.global.ui.main.mode = df.ui_sidebar_mode.Stockpiles
+    df.global.plotinfo.main.mode = df.ui_sidebar_mode.Stockpiles
 end
 
 function UnitPathUI:onDestroy()
     self:moveCursorTo(copyall(self.unit.pos))
-    df.global.ui.main.mode = self.saved_mode
+    df.global.plotinfo.main.mode = self.saved_mode
 end
 
 local function getTileType(cursor)

@@ -295,7 +295,7 @@ void StockpileSerializer::unserialize_list_material ( FuncMaterialAllowed is_all
     //  we muck with it.
     std::set<int32_t> idx_set;
     pile_list->clear();
-    pile_list->resize ( world->raws.inorganics.size(),  0 );
+    pile_list->resize ( world->raws.inorganics.all.size(),  0 );
     for ( int i = 0; i < pile_list->size(); ++i )
     {
         MaterialInfo mi ( 0,  i );
@@ -414,8 +414,6 @@ void StockpileSerializer::serialize_list_itemdef ( FuncWriteExport add_value,  s
         if ( list.at ( i ) )
         {
             const df::itemdef *a = items.at ( i );
-            // skip procedurally generated items
-            if ( a->base_flags.is_set ( 0 ) ) continue;
             ItemTypeInfo ii;
             if ( !ii.decode ( type,  i ) ) continue;
             add_value ( ii.getToken() );
@@ -466,9 +464,6 @@ int StockpileSerializer::other_mats_token ( const std::map<int, std::string> oth
 void StockpileSerializer::write_general()
 {
     mBuffer.set_max_bins ( mPile->max_barrels );
-    mBuffer.set_max_wheelbarrows ( mPile->max_wheelbarrows );
-    mBuffer.set_use_links_only ( mPile->use_links_only );
-    mBuffer.set_unknown1 ( mPile->settings.unk1 );
     mBuffer.set_allow_inorganic ( mPile->settings.allow_inorganic );
     mBuffer.set_allow_organic ( mPile->settings.allow_organic );
     mBuffer.set_corpses ( mPile->settings.flags.bits.corpses );
@@ -478,14 +473,8 @@ void StockpileSerializer::read_general()
 {
     if ( mBuffer.has_max_bins() )
         mPile->max_bins = mBuffer.max_bins();
-    if ( mBuffer.has_max_wheelbarrows() )
-        mPile->max_wheelbarrows = mBuffer.max_wheelbarrows();
     if ( mBuffer.has_max_barrels() )
         mPile->max_barrels = mBuffer.max_barrels();
-    if ( mBuffer.has_use_links_only() )
-        mPile->use_links_only = mBuffer.use_links_only();
-    if ( mBuffer.has_unknown1() )
-        mPile->settings.unk1 = mBuffer.unknown1();
     if ( mBuffer.has_allow_inorganic() )
         mPile->settings.allow_inorganic = mBuffer.allow_inorganic();
     if ( mBuffer.has_allow_organic() )
@@ -1582,7 +1571,6 @@ bool StockpileSerializer::finished_goods_type_is_allowed ( item_type::item_type 
     case item_type::SPLINT:
     case item_type::CRUTCH:
     case item_type::TOOL:
-    case item_type::BOOK:
         return true;
     default:
         return false;

@@ -16,7 +16,7 @@
 #include "DataDefs.h"
 #include "df/game_type.h"
 #include "df/world.h"
-#include "df/ui.h"
+#include "df/plotinfost.h"
 #include "df/unit.h"
 #include "df/historical_entity.h"
 #include "df/world_site.h"
@@ -35,7 +35,7 @@ using namespace df::enums;
 DFHACK_PLUGIN("createitem");
 REQUIRE_GLOBAL(cursor);
 REQUIRE_GLOBAL(world);
-REQUIRE_GLOBAL(ui);
+REQUIRE_GLOBAL(plotinfo);
 REQUIRE_GLOBAL(gametype);
 
 int dest_container = -1, dest_building = -1;
@@ -71,7 +71,6 @@ DFhackCExport command_result plugin_shutdown ( color_ostream &out )
 
 bool makeItem (df::reaction_product_itemst *prod, df::unit *unit, bool second_item = false, bool move_to_cursor = false)
 {
-    vector<df::reaction_product*> out_products;
     vector<df::item *> out_items;
     vector<df::reaction_reagent *> in_reag;
     vector<df::item *> in_items;
@@ -85,9 +84,9 @@ bool makeItem (df::reaction_product_itemst *prod, df::unit *unit, bool second_it
     if (dest_building != -1)
         building = df::building::find(dest_building);
 
-    prod->produce(unit, &out_products, &out_items, &in_reag, &in_items, 1, job_skill::NONE,
-        df::historical_entity::find(unit->civ_id), 0,
-        (World::isFortressMode()) ? df::world_site::find(ui->site_id) : NULL, 0);
+    prod->produce(unit, &out_items, &in_reag, &in_items, 1, job_skill::NONE,
+        df::historical_entity::find(unit->civ_id),
+        (World::isFortressMode()) ? df::world_site::find(plotinfo->site_id) : NULL);
     if (!out_items.size())
         return false;
     // if we asked to make shoes and we got twice as many as we asked, then we're okay
@@ -111,7 +110,7 @@ bool makeItem (df::reaction_product_itemst *prod, df::unit *unit, bool second_it
         {
             on_ground = false;
             out_items[i]->flags.bits.removed = 1;
-            if (!Items::moveToBuilding(mc, out_items[i], (df::building_actual *)building, 0))
+            if (!Items::moveToBuilding(mc, out_items[i], (df::building_actual *)building, building_item_role_type::TEMP))
                 out_items[i]->moveToGround(building->centerx, building->centery, building->z);
         }
         if (on_ground)
@@ -176,10 +175,6 @@ command_result df_createitem (color_ostream &out, vector <string> & parameters)
                 if (item->hasToolUse(tool_uses::LIQUID_CONTAINER))
                     break;
                 if (item->hasToolUse(tool_uses::FOOD_STORAGE))
-                    break;
-                if (item->hasToolUse(tool_uses::SMALL_OBJECT_STORAGE))
-                    break;
-                if (item->hasToolUse(tool_uses::TRACK_CART))
                     break;
             default:
                 out.printerr("The selected item cannot be used for item storage!\n");

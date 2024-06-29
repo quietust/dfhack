@@ -19,9 +19,9 @@ local utils = require 'utils'
 local dlg = require 'gui.dialogs'
 
 local defs = df.global.world.raws.itemdefs
-local entity = df.global.ui.main.fortress_entity
-local tasks = df.global.ui.tasks
-local equipment = df.global.ui.equipment
+local entity = df.global.plotinfo.main.fortress_entity
+local tasks = df.global.plotinfo.tasks
+local equipment = df.global.plotinfo.equipment
 
 function find_best_weapon(unit,mode)
     local best = nil

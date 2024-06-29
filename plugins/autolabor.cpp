@@ -11,7 +11,7 @@
 
 // DF data structure definition headers
 #include "DataDefs.h"
-#include <df/ui.h>
+#include <df/plotinfost.h>
 #include <df/world.h>
 #include <df/unit.h>
 #include <df/unit_soul.h>
@@ -31,7 +31,7 @@
 #include <df/building_tradedepotst.h>
 #include <df/building_stockpilest.h>
 #include <df/items_other_id.h>
-#include <df/ui.h>
+#include <df/plotinfost.h>
 #include <df/activity_info.h>
 
 #include <MiscUtils.h>
@@ -47,7 +47,7 @@ using namespace DFHack;
 using namespace df::enums;
 
 DFHACK_PLUGIN("autolabor");
-REQUIRE_GLOBAL(ui);
+REQUIRE_GLOBAL(plotinfo);
 REQUIRE_GLOBAL(world);
 
 #define ARRAY_COUNT(array) (sizeof(array)/sizeof((array)[0]))
@@ -339,6 +339,8 @@ static const dwarf_state dwarf_states[] = {
     BUSY /* RemoveStairs */,
     BUSY /* ConstructQuern */,
     BUSY /* ConstructMillstone */,
+    OTHER /* UpgradeSquadEquipment */,
+    OTHER /* PrepareEquipmentManifests */,
     BUSY /* ConstructSplint */,
     BUSY /* ConstructCrutch */,
     BUSY /* ConstructTractionBench */,
@@ -352,28 +354,11 @@ static const dwarf_state dwarf_states[] = {
     BUSY /* SpinThread */,
     BUSY /* PenLargeAnimal */,
     BUSY /* PenSmallAnimal */,
+    OTHER /* Unknown220 */,
     BUSY /* MakeTool */,
     BUSY /* CollectClay */,
     BUSY /* InstallColonyInHive */,
     BUSY /* CollectHiveProducts */,
-    OTHER /* CauseTrouble */,
-    OTHER /* DrinkBlood */,
-    OTHER /* ReportCrime */,
-    OTHER /* ExecuteCriminal */,
-    BUSY /* TrainAnimal */,
-    BUSY /* CarveTrack */,
-    BUSY /* PushTrackVehicle */,
-    BUSY /* PlaceTrackVehicle */,
-    BUSY /* StoreItemInVehicle */,
-    BUSY /* GeldAnimal */,
-    BUSY /* MakeFigurine */,
-    BUSY /* MakeAmulet */,
-    BUSY /* MakeScepter */,
-    BUSY /* MakeCrown */,
-    BUSY /* MakeRing */,
-    BUSY /* MakeEarring */,
-    BUSY /* MakeBracelet */,
-    BUSY /* MakeGem */
 };
 
 struct labor_info
@@ -490,16 +475,6 @@ static const struct labor_default default_labor_infos[] = {
     /* PRESSING */              {AUTOMATIC, false, 1, 200, 0},
     /* BEEKEEPING */            {AUTOMATIC, false, 1, 200, 0},
     /* WAX_WORKING */           {AUTOMATIC, false, 1, 200, 0},
-    /* HANDLE_VEHICLES */       {HAULERS, false, 1, 200, 0},
-    /* HAUL_TRADE */            {HAULERS, false, 1, 200, 0},
-    /* PULL_LEVER */            {HAULERS, false, 1, 200, 0},
-    /* REMOVE_CONSTRUCTION */   {HAULERS, false, 1, 200, 0},
-    /* HAUL_WATER */            {HAULERS, false, 1, 200, 0},
-    /* GELD */                  {AUTOMATIC, false, 1, 200, 0},
-    /* BUILD_ROAD */            {AUTOMATIC, false, 1, 200, 0},
-    /* BUILD_CONSTRUCTION */    {AUTOMATIC, false, 1, 200, 0},
-    /* PAPERMAKING */           {AUTOMATIC, false, 1, 200, 0},
-    /* BOOKBINDING */           {AUTOMATIC, false, 1, 200, 0}
 };
 
 static const int responsibility_penalties[] = {
@@ -992,7 +967,7 @@ static void assign_labor(unit_labor::unit_labor labor,
             {
                 dwarf_info[dwarf].has_exclusive_labor = true;
                 // all the exclusive labors require equipment so this should force the dorf to reequip if needed
-                dwarfs[dwarf]->military.pickup_flags.bits.update = 1;
+                dwarfs[dwarf]->uniform.pickup_flags.bits.update = 1;
             }
 
             if (print_debug)
@@ -1038,8 +1013,8 @@ DFhackCExport command_result plugin_onupdate ( color_ostream &out )
         return CR_OK;
     step_count = 0;
 
-    uint32_t race = ui->race_id;
-    uint32_t civ = ui->civ_id;
+    uint32_t race = plotinfo->race_id;
+    uint32_t civ = plotinfo->civ_id;
 
     std::vector<df::unit *> dwarfs;
 
@@ -1139,9 +1114,9 @@ DFhackCExport command_result plugin_onupdate ( color_ostream &out )
 
         // identify dwarfs who are needed for meetings and mark them for exclusion
 
-        for (int i = 0; i < ui->activities.size(); ++i)
+        for (int i = 0; i < plotinfo->activities.size(); ++i)
         {
-            df::activity_info *act = ui->activities[i];
+            df::activity_info *act = plotinfo->activities[i];
             if (!act) continue;
             bool p1 = act->unit_actor == dwarfs[dwarf];
             bool p2 = act->unit_noble == dwarfs[dwarf];

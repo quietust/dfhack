@@ -84,7 +84,7 @@ end
 -- ---------------------------------------------------------------------------
 function clearpref_all_dwarves()
     for _,v in ipairs(df.global.world.units.active) do
-        if v.race == df.global.ui.race_id then
+        if v.race == df.global.plotinfo.race_id then
             print("Clearing Preferences for "..dfhack.TranslateName(dfhack.units.getVisibleName(v)))
             clear_preferences(v)
         end
@@ -93,7 +93,7 @@ end
 -- ---------------------------------------------------------------------------
 function adjust_all_dwarves()
     for _,v in ipairs(df.global.world.units.active) do
-        if v.race == df.global.ui.race_id then
+        if v.race == df.global.plotinfo.race_id then
             print("Adjusting "..dfhack.TranslateName(dfhack.units.getVisibleName(v)))
             brainwash_unit(v)
         end

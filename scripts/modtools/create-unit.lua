@@ -23,7 +23,7 @@ Creates a unit.  Use ``modtools/create-unit -help`` for more info.
 =end]]
 
 --[[
-if dfhack.gui.getCurViewscreen()._type ~= df.viewscreen_dwarfmodest or df.global.ui.main.mode ~= df.ui_sidebar_mode.LookAround then
+if dfhack.gui.getCurViewscreen()._type ~= df.viewscreen_dwarfmodest or df.global.plotinfo.main.mode ~= df.ui_sidebar_mode.LookAround then
   print 'activate loo[k] mode'
   return
 end
@@ -40,13 +40,13 @@ function createUnit(race_id, caste_id)
   local dwarfmodeScreen = df.viewscreen_dwarfmodest:new()
   curViewscreen.child = dwarfmodeScreen
   dwarfmodeScreen.parent = curViewscreen
-  local oldMode = df.global.ui.main.mode
-  df.global.ui.main.mode = df.ui_sidebar_mode.LookAround
+  local oldMode = df.global.plotinfo.main.mode
+  df.global.plotinfo.main.mode = df.ui_sidebar_mode.LookAround
 
   local gui = require 'gui'
 
   df.global.world.arena_spawn.race:resize(0)
-  df.global.world.arena_spawn.race:insert(0,race_id) --df.global.ui.race_id)
+  df.global.world.arena_spawn.race:insert(0,race_id) --df.global.plotinfo.race_id)
 
   df.global.world.arena_spawn.caste:resize(0)
   df.global.world.arena_spawn.caste:insert(0,caste_id)
@@ -67,7 +67,7 @@ function createUnit(race_id, caste_id)
 
   curViewscreen.child = nil
   dwarfmodeScreen:delete()
-  df.global.ui.main.mode = oldMode
+  df.global.plotinfo.main.mode = oldMode
 
   local id = df.global.unit_next_id-1
  
@@ -79,9 +79,9 @@ function createUnit(race_id, caste_id)
 end
 
 --local u = df.unit.find(df.global.unit_next_id-1)
---u.civ_id = df.global.ui.civ_id
---u.population_id = df.historical_entity.find(df.global.ui.civ_id).populations[0]
---local group = df.global.ui.group_id
+--u.civ_id = df.global.plotinfo.civ_id
+--u.population_id = df.historical_entity.find(df.global.plotinfo.civ_id).populations[0]
+--local group = df.global.plotinfo.group_id
 
 -- Picking a caste or gender at random
 function getRandomCasteId(race_id)
@@ -146,7 +146,7 @@ function createFigure(trgunit,he,he_group)
   --unk_14.region_id = -1; unk_14.beast_id = -1; unk_14.unk_14 = 0
   hf.info.unk_14.unk_18 = -1; hf.info.unk_14.unk_1c = -1
   -- set values that seem related to state and do event
-  --change_state(hf, dfg.ui.site_id, region_pos)
+  --change_state(hf, dfg.plotinfo.site_id, region_pos)
 
 
   --lets skip skills for now
@@ -166,7 +166,6 @@ function createFigure(trgunit,he,he_group)
   trgunit.flags1.important_historical_figure = true
   trgunit.flags2.important_historical_figure = true
   trgunit.hist_figure_id = hf.id
-  trgunit.hist_figure_id2 = hf.id
 
   hf.entity_links:insert("#",{new=df.histfig_entity_link_memberst,entity_id=trgunit.civ_id,link_strength=100})
 
@@ -234,16 +233,16 @@ function createUnitInCiv(race_id, caste_id, civ_id, group_id)
 end
 
 function createUnitInFortCiv(race_id, caste_id)
-  return createUnitInCiv(race_id, caste_id, df.global.ui.civ_id)
+  return createUnitInCiv(race_id, caste_id, df.global.plotinfo.civ_id)
 end
 
 function createUnitInFortCivAndGroup(race_id, caste_id)
-  return createUnitInCiv(race_id, caste_id, df.global.ui.civ_id, df.global.ui.group_id)
+  return createUnitInCiv(race_id, caste_id, df.global.plotinfo.civ_id, df.global.plotinfo.group_id)
 end
 
 function domesticate(uid, group_id)
   local u = df.unit.find(uid)
-  group_id = group_id or df.global.ui.group_id
+  group_id = group_id or df.global.plotinfo.group_id
   -- If a friendly animal, make it domesticated.  From Boltgun & Dirst
   local caste=df.creature_raw.find(u.race).caste[u.caste]
   if not(caste.flags.CAN_SPEAK and caste.flags.CAN_LEARN) then
@@ -463,14 +462,14 @@ end
 
 local civ_id
 if args.civId == '\\LOCAL' then
-  civ_id = df.global.ui.civ_id
+  civ_id = df.global.plotinfo.civ_id
 elseif args.civId and tonumber(args.civId) then
   civ_id = tonumber(args.civId)
 end
 
 local group_id
 if args.groupId == '\\LOCAL' then
-  group_id = df.global.ui.group_id
+  group_id = df.global.plotinfo.group_id
 elseif args.groupId and tonumber(args.groupId) then
   group_id = tonumber(args.groupId)
 end

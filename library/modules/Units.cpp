@@ -51,7 +51,6 @@ using namespace std;
 #include "df/burrow.h"
 #include "df/caste_raw.h"
 #include "df/creature_raw.h"
-#include "df/curse_attr_change.h"
 #include "df/entity_position.h"
 #include "df/entity_position_assignment.h"
 #include "df/entity_raw.h"
@@ -63,13 +62,13 @@ using namespace std;
 #include "df/historical_figure_info.h"
 #include "df/historical_kills.h"
 #include "df/history_event_hist_figure_diedst.h"
-#include "df/identity.h"
 #include "df/job.h"
 #include "df/nemesis_record.h"
 #include "df/squad.h"
-#include "df/ui.h"
+#include "df/plotinfost.h"
 #include "df/unit_inventory_item.h"
 #include "df/unit_misc_trait.h"
+#include "df/unit_relationship_type.h"
 #include "df/unit_skill.h"
 #include "df/unit_soul.h"
 #include "df/unit_wound.h"
@@ -78,7 +77,7 @@ using namespace std;
 using namespace DFHack;
 using namespace df::enums;
 using df::global::world;
-using df::global::ui;
+using df::global::plotinfo;
 using df::global::gamemode;
 
 bool Units::isValid()
@@ -170,9 +169,9 @@ void Units::CopyCreature(df::unit * source, t_unit & furball)
     // labors
     memcpy(&furball.labors, &source->status.labors, sizeof(furball.labors));
 
-    furball.birth_year = source->relations.birth_year;
-    furball.birth_time = source->relations.birth_time;
-    furball.pregnancy_timer = source->relations.pregnancy_timer;
+    furball.birth_year = source->birth_year;
+    furball.birth_time = source->birth_time;
+    furball.pregnancy_timer = source->pregnancy_timer;
     // appearance
     furball.nbcolors = source->appearance.colors.size();
     if(furball.nbcolors>MAX_COLORS)
@@ -453,12 +452,12 @@ bool Creatures::WritePregnancy(const uint32_t index, const uint32_t pregTimer)
 */
 uint32_t Units::GetDwarfRaceIndex()
 {
-    return ui->race_id;
+    return plotinfo->race_id;
 }
 
 int32_t Units::GetDwarfCivId()
 {
-    return ui->civ_id;
+    return plotinfo->civ_id;
 }
 /*
 bool Creatures::getCurrentCursorCreature(uint32_t & creature_index)
@@ -548,23 +547,6 @@ df::item *Units::getContainer(df::unit *unit)
     return findItemRef(unit->general_refs, general_ref_type::CONTAINED_IN_ITEM);
 }
 
-static df::identity *getFigureIdentity(df::historical_figure *figure)
-{
-    if (figure && figure->info && figure->info->reputation)
-        return df::identity::find(figure->info->reputation->cur_identity);
-
-    return NULL;
-}
-
-df::identity *Units::getIdentity(df::unit *unit)
-{
-    CHECK_NULL_POINTER(unit);
-
-    df::historical_figure *figure = df::historical_figure::find(unit->hist_figure_id);
-
-    return getFigureIdentity(figure);
-}
-
 void Units::setNickname(df::unit *unit, std::string nick)
 {
     CHECK_NULL_POINTER(unit);
@@ -582,37 +564,12 @@ void Units::setNickname(df::unit *unit, std::string nick)
     if (figure)
     {
         Translation::setNickname(&figure->name, nick);
-
-        if (auto identity = getFigureIdentity(figure))
-        {
-            auto id_hfig = df::historical_figure::find(identity->histfig_id);
-
-            if (id_hfig)
-            {
-                // Even DF doesn't do this bit, because it's apparently
-                // only used for demons masquerading as gods, so you
-                // can't ever change their nickname in-game.
-                Translation::setNickname(&id_hfig->name, nick);
-            }
-            else
-                Translation::setNickname(&identity->name, nick);
-        }
     }
 }
 
 df::language_name *Units::getVisibleName(df::unit *unit)
 {
     CHECK_NULL_POINTER(unit);
-
-    if (auto identity = getIdentity(unit))
-    {
-        auto id_hfig = df::historical_figure::find(identity->histfig_id);
-
-        if (id_hfig)
-            return &id_hfig->name;
-
-        return &identity->name;
-    }
 
     return &unit->name;
 }
@@ -632,33 +589,10 @@ df::nemesis_record *Units::getNemesis(df::unit *unit)
     return NULL;
 }
 
-
-bool Units::isHidingCurse(df::unit *unit)
-{
-    if (!unit->job.hunt_target)
-    {
-        auto identity = Units::getIdentity(unit);
-        if (identity && identity->unk_4c == 0)
-            return true;
-    }
-
-    return false;
-}
-
 int Units::getPhysicalAttrValue(df::unit *unit, df::physical_attribute_type attr)
 {
     auto &aobj = unit->body.physical_attrs[attr];
     int value = std::max(0, aobj.value - aobj.soft_demotion);
-
-    if (auto mod = unit->curse.attr_change)
-    {
-        int mvalue = (value * mod->phys_att_perc[attr] / 100) + mod->phys_att_add[attr];
-
-        if (isHidingCurse(unit))
-            value = std::min(value, mvalue);
-        else
-            value = mvalue;
-    }
 
     return std::max(0, value);
 }
@@ -670,16 +604,6 @@ int Units::getMentalAttrValue(df::unit *unit, df::mental_attribute_type attr)
 
     auto &aobj = soul->mental_attrs[attr];
     int value = std::max(0, aobj.value - aobj.soft_demotion);
-
-    if (auto mod = unit->curse.attr_change)
-    {
-        int mvalue = (value * mod->ment_att_perc[attr] / 100) + mod->ment_att_add[attr];
-
-        if (isHidingCurse(unit))
-            value = std::min(value, mvalue);
-        else
-            value = mvalue;
-    }
 
     return std::max(0, value);
 }
@@ -697,55 +621,15 @@ bool Units::casteFlagSet(int race, int caste, df::caste_raw_flags flag)
     return craw->flags.is_set(flag);
 }
 
-bool Units::isCrazed(df::unit *unit)
-{
-    CHECK_NULL_POINTER(unit);
-    if (unit->flags3.bits.scuttle)
-        return false;
-    if (unit->curse.rem_tags1.bits.CRAZED)
-        return false;
-    if (unit->curse.add_tags1.bits.CRAZED)
-        return true;
-    return casteFlagSet(unit->race, unit->caste, caste_raw_flags::CRAZED);
-}
-
-bool Units::isOpposedToLife(df::unit *unit)
-{
-    CHECK_NULL_POINTER(unit);
-    if (unit->curse.rem_tags1.bits.OPPOSED_TO_LIFE)
-        return false;
-    if (unit->curse.add_tags1.bits.OPPOSED_TO_LIFE)
-        return true;
-    return casteFlagSet(unit->race, unit->caste, caste_raw_flags::OPPOSED_TO_LIFE);
-}
-
 bool Units::hasExtravision(df::unit *unit)
 {
     CHECK_NULL_POINTER(unit);
-    if (unit->curse.rem_tags1.bits.EXTRAVISION)
-        return false;
-    if (unit->curse.add_tags1.bits.EXTRAVISION)
-        return true;
     return casteFlagSet(unit->race, unit->caste, caste_raw_flags::EXTRAVISION);
-}
-
-bool Units::isBloodsucker(df::unit *unit)
-{
-    CHECK_NULL_POINTER(unit);
-    if (unit->curse.rem_tags1.bits.BLOODSUCKER)
-        return false;
-    if (unit->curse.add_tags1.bits.BLOODSUCKER)
-        return true;
-    return casteFlagSet(unit->race, unit->caste, caste_raw_flags::BLOODSUCKER);
 }
 
 bool Units::isMischievous(df::unit *unit)
 {
     CHECK_NULL_POINTER(unit);
-    if (unit->curse.rem_tags1.bits.MISCHIEVOUS)
-        return false;
-    if (unit->curse.add_tags1.bits.MISCHIEVOUS)
-        return true;
     return casteFlagSet(unit->race, unit->caste, caste_raw_flags::MISCHIEVOUS);
 }
 
@@ -773,7 +657,7 @@ bool Units::isDead(df::unit *unit)
 {
     CHECK_NULL_POINTER(unit);
 
-    return unit->flags1.bits.dead ||
+    return unit->flags1.bits.inactive ||
            unit->flags3.bits.ghostly;
 }
 
@@ -781,21 +665,15 @@ bool Units::isAlive(df::unit *unit)
 {
     CHECK_NULL_POINTER(unit);
 
-    return !unit->flags1.bits.dead &&
-           !unit->flags3.bits.ghostly &&
-           !unit->curse.add_tags1.bits.NOT_LIVING;
+    return !unit->flags1.bits.inactive &&
+           !unit->flags3.bits.ghostly;
 }
 
 bool Units::isSane(df::unit *unit)
 {
     CHECK_NULL_POINTER(unit);
 
-    if (isDead(unit) ||
-        isOpposedToLife(unit) ||
-        unit->enemy.undead)
-        return false;
-
-    if (unit->enemy.normal_race == unit->enemy.were_race && isCrazed(unit))
+    if (isDead(unit))
         return false;
 
     switch (unit->mood)
@@ -841,8 +719,7 @@ bool Units::isDwarf(df::unit *unit)
 {
     CHECK_NULL_POINTER(unit);
 
-    return unit->race == ui->race_id ||
-           unit->enemy.normal_race == ui->race_id;
+    return unit->race == plotinfo->race_id;
 }
 
 // check for profession "war creature"
@@ -885,7 +762,7 @@ bool Units::isAvailableForAdoption(df::unit* unit)
 bool Units::isOwnCiv(df::unit* unit)
 {
     CHECK_NULL_POINTER(unit);
-    return unit->civ_id == ui->civ_id;
+    return unit->civ_id == plotinfo->civ_id;
 }
 
 // check if creature belongs to the player's group
@@ -898,7 +775,7 @@ bool Units::isOwnGroup(df::unit* unit)
     for (size_t i = 0; i < histfig->entity_links.size(); i++)
     {
         auto link = histfig->entity_links[i];
-        if (link->entity_id == ui->group_id && link->getType() == df::histfig_entity_link_type::MEMBER)
+        if (link->entity_id == plotinfo->group_id && link->getType() == df::histfig_entity_link_type::MEMBER)
             return true;
     }
     return false;
@@ -909,7 +786,7 @@ bool Units::isOwnGroup(df::unit* unit)
 bool Units::isOwnRace(df::unit* unit)
 {
     CHECK_NULL_POINTER(unit);
-    return unit->race == ui->race_id;
+    return unit->race == plotinfo->race_id;
 }
 
 // get race name by id or unit pointer
@@ -1085,17 +962,8 @@ double Units::getAge(df::unit *unit, bool true_age)
         return -1;
 
     double year_ticks = 403200.0;
-    double birth_time = unit->relations.birth_year + unit->relations.birth_time/year_ticks;
+    double birth_time = unit->birth_year + unit->birth_time/year_ticks;
     double cur_time = *cur_year + *cur_year_tick / year_ticks;
-
-    if (!true_age && unit->relations.curse_year >= 0)
-    {
-        if (auto identity = getIdentity(unit))
-        {
-            if (identity->histfig_id < 0)
-                birth_time = identity->birth_year + identity->birth_second/year_ticks;
-        }
-    }
 
     return cur_time - birth_time;
 }
@@ -1194,7 +1062,7 @@ int Units::getEffectiveSkill(df::unit *unit, df::job_skill skill_id)
         if (unit->counters.winded > 0) rating >>= 1;
         if (unit->counters.stunned > 0) rating >>= 1;
         if (unit->counters.dizziness > 0) rating >>= 1;
-        if (unit->counters2.fever > 0) rating >>= 1;
+        if (unit->counters.fever > 0) rating >>= 1;
     }
 
     if (unit->counters.soldier_mood != df::unit::T_counters::MartialTrance)
@@ -1209,13 +1077,13 @@ int Units::getEffectiveSkill(df::unit *unit, df::job_skill skill_id)
         {
             rating >>= 1;
         }
-        if (unit->counters2.exhaustion >= 2000)
+        if (unit->counters.exhaustion >= 2000)
         {
             rating = rating*3/4;
-            if (unit->counters2.exhaustion >= 4000)
+            if (unit->counters.exhaustion >= 4000)
             {
                 rating = rating*3/4;
-                if (unit->counters2.exhaustion >= 6000)
+                if (unit->counters.exhaustion >= 6000)
                     rating = rating*3/4;
             }
         }
@@ -1225,33 +1093,19 @@ int Units::getEffectiveSkill(df::unit *unit, df::job_skill skill_id)
 
     bool is_adventure = (gamemode && *gamemode == game_mode::ADVENTURE);
 
-    if (!unit->flags3.bits.scuttle && isBloodsucker(unit))
-    {
-        using namespace df::enums::misc_trait_type;
-
-        if (auto trait = getMiscTrait(unit, TimeSinceSuckedBlood))
-        {
-            adjust_skill_rating(
-                rating, is_adventure, trait->value,
-                302400, 403200,           // dwf 3/4; 1/2
-                1209600, 1209600, 2419200 // adv 9/10; 3/4; 1/2
-            );
-        }
-    }
-
     adjust_skill_rating(
-        rating, is_adventure, unit->counters2.thirst_timer,
+        rating, is_adventure, unit->counters.thirst_timer,
         50000, 50000, 115200, 172800, 345600
     );
     adjust_skill_rating(
-        rating, is_adventure, unit->counters2.hunger_timer,
+        rating, is_adventure, unit->counters.hunger_timer,
         75000, 75000, 172800, 1209600, 2592000
     );
-    if (is_adventure && unit->counters2.sleepiness_timer >= 846000)
+    if (is_adventure && unit->counters.sleepiness_timer >= 846000)
         rating >>= 2;
     else
         adjust_skill_rating(
-            rating, is_adventure, unit->counters2.sleepiness_timer,
+            rating, is_adventure, unit->counters.sleepiness_timer,
             150000, 150000, 172800, 259200, 345600
         );
 
@@ -1300,8 +1154,8 @@ static int calcInventoryWeight(df::unit *unit)
         if (!item->flags.bits.weight_computed)
             continue;
 
-        int wval = item->weight;
-        int wfval = item->weight_fraction;
+        int wval = item->weight.whole;
+        int wfval = item->weight.fraction;
         auto mode = unit->inventory[i]->mode;
 
         if ((mode == df::unit_inventory_item::Worn ||
@@ -1345,17 +1199,6 @@ int Units::computeMovementSpeed(df::unit *unit)
     if (unit->flags3.bits.ghostly)
         return speed;
 
-    // Curse multiplier
-
-    if (unit->curse.speed_mul_percent != 100)
-    {
-        speed *= 100;
-        if (unit->curse.speed_mul_percent != 0)
-            speed /= unit->curse.speed_mul_percent;
-    }
-
-    speed += unit->curse.speed_add;
-
     // Swimming
 
     auto cur_liquid = unit->status2.liquid_type.bits.liquid_type;
@@ -1367,7 +1210,7 @@ int Units::computeMovementSpeed(df::unit *unit)
         if (in_magma)
             speed *= 2;
 
-        if (craw->flags.is_set(caste_raw_flags::SWIMS_LEARNED))
+        if (craw->flags.is_set(caste_raw_flags::CAN_SWIM))
         {
             int skill = Units::getEffectiveSkill(unit, job_skill::SWIMMING);
 
@@ -1389,16 +1232,13 @@ int Units::computeMovementSpeed(df::unit *unit)
     if (isBaby(unit))
         speed += 3000;
 
-    if (unit->flags3.bits.unk15)
-        speed /= 20;
-
-    if (unit->counters2.exhaustion >= 2000)
+    if (unit->counters.exhaustion >= 2000)
     {
         speed += 200;
-        if (unit->counters2.exhaustion >= 4000)
+        if (unit->counters.exhaustion >= 4000)
         {
             speed += 200;
-            if (unit->counters2.exhaustion >= 6000)
+            if (unit->counters.exhaustion >= 6000)
                 speed += 200;
         }
     }
@@ -1411,7 +1251,7 @@ int Units::computeMovementSpeed(df::unit *unit)
         if (unit->counters.winded > 0) speed += 1000;
         if (unit->counters.stunned > 0) speed += 1000;
         if (unit->counters.dizziness > 0) speed += 1000;
-        if (unit->counters2.fever > 0) speed += 1000;
+        if (unit->counters.fever > 0) speed += 1000;
     }
 
     if (unit->counters.soldier_mood != df::unit::T_counters::MartialTrance)
@@ -1424,36 +1264,23 @@ int Units::computeMovementSpeed(df::unit *unit)
 
     bool is_adventure = (gamemode && *gamemode == game_mode::ADVENTURE);
 
-    if (!unit->flags3.bits.scuttle && Units::isBloodsucker(unit))
-    {
-        using namespace df::enums::misc_trait_type;
-
-        if (auto trait = Units::getMiscTrait(unit, TimeSinceSuckedBlood))
-        {
-            adjust_speed_rating(
-                speed, is_adventure, trait->value,
-                302400, 403200,                    // dwf 100; 200
-                1209600, 1209600, 1209600, 2419200 // adv 50; 75; 100; 200
-            );
-        }
-    }
-
     adjust_speed_rating(
-        speed, is_adventure, unit->counters2.thirst_timer,
+        speed, is_adventure, unit->counters.thirst_timer,
         50000, 0x7fffffff, 172800, 172800, 172800, 345600
     );
     adjust_speed_rating(
-        speed, is_adventure, unit->counters2.hunger_timer,
+        speed, is_adventure, unit->counters.hunger_timer,
         75000, 0x7fffffff, 1209600, 1209600, 1209600, 2592000
     );
     adjust_speed_rating(
-        speed, is_adventure, unit->counters2.sleepiness_timer,
+        speed, is_adventure, unit->counters.sleepiness_timer,
         57600, 150000, 172800, 259200, 345600, 864000
     );
 
     // Activity state
 
-    if (unit->relations.draggee_id != -1) speed += 1000;
+    if (unit->relationship_ids[df::unit_relationship_type::Draggee] != -1)
+        speed += 1000;
 
     if (unit->flags1.bits.on_ground)
         speed += 2000;
@@ -1469,8 +1296,8 @@ int Units::computeMovementSpeed(df::unit *unit)
         speed += 2000 - 100*std::min(20, skill);
     }
 
-    if (unsigned(unit->counters2.paralysis-1) <= 98)
-        speed += unit->counters2.paralysis*10;
+    if (unsigned(unit->counters.paralysis-1) <= 98)
+        speed += unit->counters.paralysis*10;
     if (unsigned(unit->counters.webbed-1) <= 8)
         speed += unit->counters.webbed*100;
 
@@ -1522,7 +1349,7 @@ int Units::computeMovementSpeed(df::unit *unit)
     if (is_adventure)
     {
         auto player = vector_get(world->units.active, 0);
-        if (player && player->id == unit->relations.group_leader_id)
+        if (player && player->id == unit->relationship_ids[df::unit_relationship_type::GroupLeader])
             speed = std::min(speed, computeMovementSpeed(player));
     }
 
@@ -1551,26 +1378,21 @@ float Units::computeSlowdownFactor(df::unit *unit)
     {
         if (!unit->flags1.bits.marauder &&
             casteFlagSet(unit->race, unit->caste, caste_raw_flags::MEANDERER) &&
-            !(unit->relations.following && isCitizen(unit)) &&
+            !(unit->following && isCitizen(unit)) &&
             linear_index(unit->inventory, &df::unit_inventory_item::mode,
                          df::unit_inventory_item::Hauled) < 0)
         {
             coeff *= 4.0f;
         }
 
-        if (unit->relations.group_leader_id < 0 &&
+        if (unit->relationship_ids[df::unit_relationship_type::GroupLeader] < 0 &&
             unit->flags1.bits.active_invader &&
-            !unit->job.current_job && !unit->flags3.bits.no_meandering &&
+            !unit->job.current_job &&
             unit->profession != profession::THIEF && unit->profession != profession::MASTER_THIEF &&
             !entityRawFlagSet(unit->civ_id, entity_raw_flags::ITEM_THIEF))
         {
             coeff *= 3.0f;
         }
-    }
-
-    if (unit->flags3.bits.floundering)
-    {
-        coeff *= 3.0f;
     }
 
     return coeff;
@@ -1666,7 +1488,7 @@ std::string Units::getCasteProfessionName(int race, int casteid, df::profession 
 
     if (pid < (df::profession)0 || !is_valid_enum_item(pid))
         return "";
-    int16_t current_race = df::global::ui->race_id;
+    int16_t current_race = df::global::plotinfo->race_id;
     if (df::global::gamemode && *df::global::gamemode == df::game_mode::ADVENTURE)
         current_race = world->units.active[0]->race;
     bool use_race_prefix = (race >= 0 && race != current_race);
@@ -1806,7 +1628,7 @@ int8_t Units::getCasteProfessionColor(int race, int casteid, df::profession pid)
     {
         if (auto caste = vector_get(creature->caste, casteid))
         {
-            if (caste->flags.is_set(caste_raw_flags::CASTE_COLOR))
+            if (caste->flags.is_set(caste_raw_flags::HAS_COLOR))
                 return caste->caste_color[0] + caste->caste_color[2] * 8;
         }
         return creature->color[0] + creature->color[2] * 8;
@@ -1854,24 +1676,7 @@ bool Units::isTame(df::unit* unit)
     bool tame = false;
     if(unit->flags1.bits.tame)
     {
-        switch (unit->training_level)
-        {
-        case df::animal_training_level::SemiWild: //??
-        case df::animal_training_level::Trained:
-        case df::animal_training_level::WellTrained:
-        case df::animal_training_level::SkilfullyTrained:
-        case df::animal_training_level::ExpertlyTrained:
-        case df::animal_training_level::ExceptionallyTrained:
-        case df::animal_training_level::MasterfullyTrained:
-        case df::animal_training_level::Domesticated:
-            tame=true;
-            break;
-        case df::animal_training_level::Unk8:     //??
-        case df::animal_training_level::WildUntamed:
-        default:
-            tame=false;
-            break;
-        }
+        tame=true;
     }
     return tame;
 }
@@ -1883,33 +1688,7 @@ bool Units::isTrained(df::unit* unit)
     if(Units::isWar(unit) || Units::isHunter(unit))
         return true;
 
-    // case b: tamed and trained wild creature, gets a training level
-    bool trained = false;
-    switch (unit->training_level)
-    {
-    case df::animal_training_level::Trained:
-    case df::animal_training_level::WellTrained:
-    case df::animal_training_level::SkilfullyTrained:
-    case df::animal_training_level::ExpertlyTrained:
-    case df::animal_training_level::ExceptionallyTrained:
-    case df::animal_training_level::MasterfullyTrained:
-    //case df::animal_training_level::Domesticated:
-        trained = true;
-        break;
-    default:
-        break;
-    }
-    return trained;
-}
-
-bool Units::isGay(df::unit* unit)
-{
-    CHECK_NULL_POINTER(unit);
-    if (!unit->status.current_soul)
-        return false;
-    df::orientation_flags orientation = unit->status.current_soul->orientation_flags;
-    return (Units::isFemale(unit) && ! (orientation.whole & (orientation.mask_marry_male | orientation.mask_romance_male)))
-        || (!Units::isFemale(unit) && ! (orientation.whole & (orientation.mask_marry_female | orientation.mask_romance_female)));
+    return false;
 }
 
 bool Units::isNaked(df::unit* unit)
@@ -1922,45 +1701,18 @@ bool Units::isNaked(df::unit* unit)
 bool Units::isUndead(df::unit* unit)
 {
     CHECK_NULL_POINTER(unit);
-    // ignore vampires, they should be treated like normal dwarves
-    return (unit->flags3.bits.ghostly ||
-            ( (unit->curse.add_tags1.bits.OPPOSED_TO_LIFE || unit->curse.add_tags1.bits.NOT_LIVING)
-             && !unit->curse.add_tags1.bits.BLOODSUCKER ));
-}
-
-bool Units::isGelded(df::unit* unit)
-{
-    CHECK_NULL_POINTER(unit);
-    auto wounds = unit->body.wounds;
-    for(auto wound = wounds.begin(); wound != wounds.end(); ++wound)
-    {
-        auto parts = (*wound)->parts;
-        for (auto part = parts.begin(); part != parts.end(); ++part)
-        {
-            if ((*part)->flags2.bits.gelded)
-                return true;
-        }
-    }
-    return false;
+    return (unit->flags1.bits.zombie || unit->flags1.bits.skeleton || unit->flags3.bits.ghostly);
 }
 
 // check if creature is domesticated
-// seems to be the only way to really tell if it's completely safe to autonestbox it (training can revert)
+// seems to be the only way to really tell if it's completely safe to autonestbox it
 bool Units::isDomesticated(df::unit* unit)
 {
     CHECK_NULL_POINTER(unit);
     bool tame = false;
     if(unit->flags1.bits.tame)
     {
-        switch (unit->training_level)
-        {
-        case df::animal_training_level::Domesticated:
-            tame=true;
-            break;
-        default:
-            tame=false;
-            break;
-        }
+        tame=true;
     }
     return tame;
 }

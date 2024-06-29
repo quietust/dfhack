@@ -21,7 +21,7 @@ local guidm = require 'gui.dwarfmode'
 local dlg = require 'gui.dialogs'
 
 local plugin = require('plugins.power-meter')
-local bselector = df.global.ui_build_selector
+local bselector = df.global.buildreq
 
 PowerMeter = defclass(PowerMeter, guidm.MenuOverlay)
 

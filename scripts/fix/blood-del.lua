@@ -7,7 +7,7 @@ fix/blood-del
 Makes it so that future caravans won't bring barrels full of blood, ichor, or goo.
 
 =end]]
-local my_entity=df.historical_entity.find(df.global.ui.civ_id)
+local my_entity=df.historical_entity.find(df.global.plotinfo.civ_id)
 local sText=" "
 local k=0
 local v=1

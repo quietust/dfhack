@@ -12,8 +12,8 @@
 #include "df/build_req_choice_genst.h"
 #include "df/build_req_choice_specst.h"
 #include "df/item.h"
-#include "df/ui.h"
-#include "df/ui_build_selector.h"
+#include "df/plotinfost.h"
+#include "df/buildreq.h"
 #include "df/viewscreen_dwarfmodest.h"
 #include "df/items_other_id.h"
 #include "df/job.h"
@@ -39,8 +39,8 @@
 #include "df/building.h"
 #include "df/building_doorst.h"
 
-using df::global::ui;
-using df::global::ui_build_selector;
+using df::global::plotinfo;
+using df::global::buildreq;
 using df::global::world;
 
 struct MaterialDescriptor
@@ -214,9 +214,9 @@ private:
             }
         }
 
-        for (size_t i = 0; i < raws.inorganics.size(); i++)
+        for (size_t i = 0; i < raws.inorganics.all.size(); i++)
         {
-            df::inorganic_raw *p = raws.inorganics[i];
+            df::inorganic_raw *p = raws.inorganics.all[i];
             MaterialInfo material;
             material.decode(0, i);
             addMaterialEntry(selected_category, material, material.toString());

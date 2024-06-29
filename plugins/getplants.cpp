@@ -123,9 +123,9 @@ command_result df_getplants (color_ostream &out, vector <string> & parameters)
         df::tiletype_shape shape = tileShape(cur->tiletype[x][y]);
         df::tiletype_material material = tileMaterial(cur->tiletype[x][y]);
         df::tiletype_special special = tileSpecial(cur->tiletype[x][y]);
-        if (plant->flags.bits.is_shrub && (treesonly || !(shape == tiletype_shape::SHRUB && special != tiletype_special::DEAD)))
+        if (ENUM_ATTR(plant_type, is_shrub, df::plant_type(plant->type.value)) && (treesonly || !(shape == tiletype_shape::SHRUB && special != tiletype_special::DEAD)))
             continue;
-        if (!plant->flags.bits.is_shrub && (shrubsonly || !(material == tiletype_material::TREE)))
+        if (!ENUM_ATTR(plant_type, is_shrub, df::plant_type(plant->type.value)) && (shrubsonly || !(shape == tiletype_shape::TREE)))
             continue;
         if (cur->designation[x][y].bits.hidden)
             continue;
@@ -142,7 +142,7 @@ command_result df_getplants (color_ostream &out, vector <string> & parameters)
             ++count;
         }
         if (dirty)
-            cur->flags.bits.designated = true;
+            cur->flags.set(block_flags::Designated);
     }
     if (count)
         out.print("Updated %d plant designations.\n", count);

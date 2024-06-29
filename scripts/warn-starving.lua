@@ -120,7 +120,7 @@ function doCheck()
     for i=#units-1, 0, -1 do
         local unit = units[i]
         local rraw = findRaceCaste(unit)
-        if rraw and not unit.flags1.dead and not dfhack.units.isOpposedToLife(unit) then
+        if rraw and not unit.flags1.inactive then
             table.insert(messages, checkVariable(unit.counters2.hunger_timer, 75000, 'starving', starvingUnits, unit))
             table.insert(messages, checkVariable(unit.counters2.thirst_timer, 50000, 'dehydrated', dehydratedUnits, unit))
             table.insert(messages, checkVariable(unit.counters2.sleepiness_timer, 150000, 'very drowsy', sleepyUnits, unit))

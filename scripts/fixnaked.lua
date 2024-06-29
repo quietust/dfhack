@@ -12,7 +12,7 @@ local total_fixed = 0
 local total_removed = 0
 
 for fnUnitCount,fnUnit in ipairs(df.global.world.units.all) do
-    if fnUnit.race == df.global.ui.race_id then
+    if fnUnit.race == df.global.plotinfo.race_id then
         local listEvents = fnUnit.status.recent_events
         --for lkey,lvalue in pairs(listEvents) do
         --    print(df.unit_thought_type[lvalue.type],lvalue.type,lvalue.age,lvalue.subtype,lvalue.severity)

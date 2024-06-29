@@ -44,8 +44,6 @@ using namespace std;
 #include "modules/Items.h"
 #include "modules/Units.h"
 
-#include "df/body_part_raw.h"
-#include "df/body_part_template_flags.h"
 #include "df/building.h"
 #include "df/building_actual.h"
 #include "df/caste_raw.h"
@@ -81,7 +79,7 @@ using namespace std;
 #include "df/reaction_product_itemst.h"
 #include "df/tool_uses.h"
 #include "df/trapcomp_flags.h"
-#include "df/ui.h"
+#include "df/plotinfost.h"
 #include "df/unit.h"
 #include "df/unit_inventory_item.h"
 #include "df/vermin.h"
@@ -92,7 +90,7 @@ using namespace std;
 using namespace DFHack;
 using namespace df::enums;
 using df::global::world;
-using df::global::ui;
+using df::global::plotinfo;
 using df::global::ui_selected_unit;
 using df::global::proj_next_id;
 
@@ -656,7 +654,7 @@ df::coord Items::getPosition(df::item *item)
             switch (ref->type)
             {
             case specific_ref_type::VERMIN_ESCAPED_PET:
-                return ref->vermin->pos;
+                return ref->data.vermin->pos;
 
             default:
                 break;
@@ -719,8 +717,6 @@ static bool detachItem(MapExtras::MapCache &mc, df::item *item)
 {
     if (!item->specific_refs.empty())
         return false;
-    if (item->world_data_id != -1)
-        return false;
 
     for (size_t i = 0; i < item->general_refs.size(); i++)
     {
@@ -781,7 +777,7 @@ static bool detachItem(MapExtras::MapCache &mc, df::item *item)
                 if (auto unit = ref->getUnit())
                 {
                     // Unit view sidebar holds inventory item pointers
-                    if (ui->main.mode == ui_sidebar_mode::ViewUnits &&
+                    if (plotinfo->main.mode == ui_sidebar_mode::ViewUnits &&
                         (!ui_selected_unit ||
                          vector_get(world->units.active, *ui_selected_unit) == unit))
                         return false;
@@ -893,7 +889,7 @@ bool DFHack::Items::moveToContainer(MapExtras::MapCache &mc, df::item *item, df:
 }
 
 bool DFHack::Items::moveToBuilding(MapExtras::MapCache &mc, df::item *item, df::building_actual *building,
-    int16_t use_mode, bool force_in_building)
+    df::building_item_role_type use_mode, bool force_in_building)
 {
     CHECK_NULL_POINTER(item);
     CHECK_NULL_POINTER(building);
@@ -1096,7 +1092,6 @@ int Items::getItemBaseValue(int16_t item_type, int16_t item_subtype, int16_t mat
     case item_type::SPLINT:
     case item_type::CRUTCH:
     case item_type::SLAB:
-    case item_type::BOOK:
         value = 10;
         break;
 
@@ -1161,7 +1156,7 @@ int Items::getItemBaseValue(int16_t item_type, int16_t item_subtype, int16_t mat
 
     case item_type::MEAT:
     case item_type::PLANT:
-    case item_type::PLANT_GROWTH:
+    case item_type::LEAVES:
     case item_type::CHEESE:
         value = 2;
         break;
@@ -1368,16 +1363,14 @@ int32_t Items::createItem(df::item_type item_type, int16_t item_subtype, int16_t
     }
 
     //makeItem
-    vector<df::reaction_product*> out_products;
     vector<df::item*> out_items;
     vector<df::reaction_reagent*> in_reag;
     vector<df::item*> in_items;
 
     df::enums::game_type::game_type type = *df::global::gametype;
-    prod->produce(unit, &out_products, &out_items, &in_reag, &in_items, 1, job_skill::NONE,
-            df::historical_entity::find(unit->civ_id), 0,
-            ((type == df::enums::game_type::DWARF_MAIN) || (type == df::enums::game_type::DWARF_RECLAIM)) ? df::world_site::find(df::global::ui->site_id) : NULL,
-            0);
+    prod->produce(unit, &out_items, &in_reag, &in_items, 1, job_skill::NONE,
+            df::historical_entity::find(unit->civ_id),
+            ((type == df::enums::game_type::DWARF_MAIN) || (type == df::enums::game_type::DWARF_RECLAIM)) ? df::world_site::find(df::global::plotinfo->site_id) : NULL);
     if ( out_items.size() != 1 )
         return -1;
 

@@ -24,7 +24,7 @@
 #include "df/job.h"
 #include "df/job_item.h"
 #include "df/job_item_ref.h"
-#include "df/ui.h"
+#include "df/plotinfost.h"
 #include "df/report.h"
 #include "df/reaction.h"
 #include "df/reaction_reagent_itemst.h"
@@ -45,7 +45,7 @@ DFHACK_PLUGIN("add-spatter");
 DFHACK_PLUGIN_IS_ENABLED(is_enabled);
 REQUIRE_GLOBAL(gps);
 REQUIRE_GLOBAL(world);
-REQUIRE_GLOBAL(ui);
+REQUIRE_GLOBAL(plotinfo);
 
 typedef df::reaction_product_item_improvementst improvement_product;
 
@@ -133,8 +133,8 @@ static int has_contaminant(df::item_actual *item, int type, int index)
     for (size_t i = 0; i < cont->size(); i++)
     {
         auto cur = (*cont)[i];
-        if (cur->mat_type == type && cur->mat_index == index)
-            size += cur->size;
+        if (cur->base.mat_type == type && cur->base.mat_index == index)
+            size += cur->base.size;
     }
 
     return size;
@@ -152,7 +152,7 @@ static void index_items(item_table &table, df::job *job, ReactionInfo *info)
     {
         auto iref = job->items[i];
         if (iref->job_item_idx < 0) continue;
-        auto iitem = job->job_items[iref->job_item_idx];
+        auto iitem = job->job_items.elements[iref->job_item_idx];
 
         if (iitem->contains.empty())
         {
@@ -244,12 +244,12 @@ struct product_hook : improvement_product {
     DEFINE_VMETHOD_INTERPOSE(
         void, produce,
         (df::unit *unit,
-         std::vector<df::reaction_product*> *out_products,
          std::vector<df::item*> *out_items,
          std::vector<df::reaction_reagent*> *in_reag,
          std::vector<df::item*> *in_items,
-         int32_t quantity, df::job_skill skill,
-         df::historical_entity *entity, int32_t unk, df::world_site *site, void* unk2)
+         int quantity,
+         df::job_skill skill,
+         df::historical_entity *entity, df::world_site *site)
     ) {
         if (auto product = products[this])
         {
@@ -295,7 +295,7 @@ struct product_hook : improvement_product {
             return;
         }
 
-        INTERPOSE_NEXT(produce)(unit, out_products, out_items, in_reag, in_items, quantity, skill, entity, unk, site, unk2);
+        INTERPOSE_NEXT(produce)(unit, out_items, in_reag, in_items, quantity, skill, entity, site);
     }
 };
 
@@ -356,7 +356,7 @@ static bool find_reactions(color_ostream &out)
     reactions.clear();
     products.clear();
 
-    auto &rlist = world->raws.reactions;
+    auto &rlist = world->raws.reactions.all;
 
     for (size_t i = 0; i < rlist.size(); i++)
     {

@@ -37,10 +37,10 @@ function log_on_load(op)
     end
 
     -- Log site information for forts
-    if df.world_site.find(df.global.ui.site_id) == nil then return end
-    local site = df.world_site.find(df.global.ui.site_id)
-    local fort_ent = df.global.ui.main.fortress_entity
-    local civ_ent = df.historical_entity.find(df.global.ui.civ_id)
+    if df.world_site.find(df.global.plotinfo.site_id) == nil then return end
+    local site = df.world_site.find(df.global.plotinfo.site_id)
+    local fort_ent = df.global.plotinfo.main.fortress_entity
+    local civ_ent = df.historical_entity.find(df.global.plotinfo.civ_id)
     local function fullname(item)
         return dfhack.TranslateName(item.name)..' ('..dfhack.TranslateName(item.name ,true)..')'
     end

@@ -14,11 +14,12 @@
 
 #include "modules/Units.h"
 
-#include "df/graphic.h"
+#include "df/graphicst.h"
 #include "df/viewscreen_dwarfmodest.h"
 #include "df/viewscreen_dungeonmodest.h"
 #include "df/flow_info.h"
 #include "df/world.h"
+#include "df/plotinfost.h"
 #include "df/building.h"
 #include "df/building_doorst.h"
 #include "df/building_floodgatest.h"
@@ -89,13 +90,13 @@ rect2d getMapViewport()
     int menu_x1=area_x2-MENU_WIDTH-1;
     int view_rb=w-1;
 
-    int area_pos=*df::global::ui_area_map_width;
-    int menu_pos=*df::global::ui_menu_width;
+    int area_pos=(*df::global::ui_menu_width)[0];
+    int menu_pos=(*df::global::ui_menu_width)[1];
     if(area_pos<3)
     {
         view_rb=area_x2;
     }
-    if (menu_pos<area_pos || df::global::ui->main.mode!=0)
+    if (menu_pos<area_pos || df::global::plotinfo->main.mode!=0)
     {
         if (menu_pos >= area_pos)
             menu_pos = area_pos-1;
@@ -800,7 +801,7 @@ void lightingEngineViewscreen::doOcupancyAndLights()
             if (DFHack::Units::isCitizen(u) && !u->counters.unconscious)
                 addLight(getIndex(pos.x,pos.y),matCitizen.makeSource());
             creatureLightDef *def=getCreatureDef(u);
-            if(def && !u->flags1.bits.dead)
+            if(def && !u->flags1.bits.inactive)
             {
                 addLight(getIndex(pos.x,pos.y),def->light.makeSource());
             }
