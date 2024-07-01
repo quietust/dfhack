@@ -71,9 +71,31 @@ command_result df_regrass (color_ostream &out, vector <string> & parameters)
         }
         if(!grev)
         {
-            // in this worst case we should check other blocks, create a new event etc
-            // but looking at some maps that should happen very very rarely if at all
-            // a standard map block seems to always have up to 10 grass events we can refresh
+            // If we didn't find any grass events, then at least create "fake" grass
+            // for old fortresses which predated the introduction of custom grass types
+            for (int y = 0; y < 16; y++)
+            {
+                for (int x = 0; x < 16; x++)
+                {
+                    if (   tileShape(cur->tiletype[x][y]) != tiletype_shape::FLOOR
+                        || cur->designation[x][y].bits.subterranean
+                        || cur->occupancy[x][y].bits.building
+                        || cur->occupancy[x][y].bits.no_grow)
+                        continue;
+
+                    // don't touch furrowed tiles (dirt roads made on soil)
+                    if(tileSpecial(cur->tiletype[x][y]) == tiletype_special::FURROWED)
+                        continue;
+
+                    int mat = tileMaterial(cur->tiletype[x][y]);
+                    if (   mat != tiletype_material::SOIL
+                        && mat != tiletype_material::ASHES) // refill ashes too
+                        continue;
+
+                    cur->tiletype[x][y] = findRandomVariant((rand() & 1) ? tiletype::GrassLightFloor1 : tiletype::GrassDarkFloor1);
+                    count++;
+                }
+            }
             continue;
         }
 
