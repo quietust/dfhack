@@ -44,8 +44,42 @@ df.global.pause_state = true
 
 local changed = false
 
+function inject_inorganic(name)
+    for _,v in ipairs(raws.inorganics.all) do
+        if v.id == name then
+            print('Inorganic '..name..' already exists.')
+            return
+        end
+    end
+
+    print('Injecting inorganic '..name)
+    changed = true
+
+    raws.inorganics.all:insert('#', {
+        new = true,
+        id = name,
+    })
+end
+
+function inject_plant(name)
+    for _,v in ipairs(raws.plants.all) do
+        if v.id == name then
+            print('Plant '..name..' already exists.')
+            return
+        end
+    end
+
+    print('Injecting plant '..name)
+    changed = true
+
+    raws.plants.all:insert('#', {
+        new = true,
+        id = name,
+    })
+end
+
 function inject_reaction(name)
-    for _,v in ipairs(raws.reactions) do
+    for _,v in ipairs(raws.reactions.all) do
         if v.code == name then
             print('Reaction '..name..' already exists.')
             return
@@ -55,11 +89,11 @@ function inject_reaction(name)
     print('Injecting reaction '..name)
     changed = true
 
-    raws.reactions:insert('#', {
+    raws.reactions.all:insert('#', {
         new = true,
         code = name,
         name = 'Dummy reaction '..name,
-        index = #raws.reactions,
+        index = #raws.reactions.all,
     })
 end
 
@@ -172,6 +206,10 @@ local ops = {}
 for _,kv in ipairs(args) do
     if mode and string.match(kv, '^[%u_]+$') then
         table.insert(ops, curry(mode, kv))
+    elseif kv == 'inorganic' then
+        mode = inject_inorganic
+    elseif kv == 'plant' then
+        mode = inject_plant
     elseif kv == 'reaction' then
         mode = inject_reaction
     elseif building_types[kv] then
