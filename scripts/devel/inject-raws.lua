@@ -44,8 +44,42 @@ df.global.pause_state = true
 
 local changed = false
 
+function inject_inorganic(name)
+    for _,v in ipairs(raws.inorganics.all) do
+        if v.id == name then
+            print('Inorganic '..name..' already exists.')
+            return
+        end
+    end
+
+    print('Injecting inorganic '..name)
+    changed = true
+
+    raws.inorganics.all:insert('#', {
+        new = true,
+        id = name,
+    })
+end
+
+function inject_plant(name)
+    for _,v in ipairs(raws.plants.all) do
+        if v.id == name then
+            print('Plant '..name..' already exists.')
+            return
+        end
+    end
+
+    print('Injecting plant '..name)
+    changed = true
+
+    raws.plants.all:insert('#', {
+        new = true,
+        id = name,
+    })
+end
+
 function inject_reaction(name)
-    for _,v in ipairs(raws.reactions) do
+    for _,v in ipairs(raws.reactions.all) do
         if v.code == name then
             print('Reaction '..name..' already exists.')
             return
@@ -55,11 +89,11 @@ function inject_reaction(name)
     print('Injecting reaction '..name)
     changed = true
 
-    raws.reactions:insert('#', {
+    raws.reactions.all:insert('#', {
         new = true,
         code = name,
         name = 'Dummy reaction '..name,
-        index = #raws.reactions,
+        index = #raws.reactions.all,
     })
 end
 
@@ -124,45 +158,57 @@ function add_to_civ(entity, bvec, id)
     entity.resources[bvec]:insert('#', id)
 end
 
-function add_to_dwarf_civs(btype, id)
+civtypes = {}
+function add_to_civs(btype, id)
     local typeinfo = item_types[btype]
     if not typeinfo[3] then
         print('Not adding to civs.')
     end
 
     for _,entity in ipairs(df.global.world.entities.all) do
-        if entity.race == df.global.plotinfo.race_id then
-            add_to_civ(entity, typeinfo[3], id)
+        if #civtypes == 0 then
+            if entity.race == df.global.plotinfo.race_id then
+                add_to_civ(entity, typeinfo[3], id)
+            end
+        else
+            for _,civtype in ipairs(civtypes) do
+                if entity.entity_raw.code == civtype then
+                    add_to_civ(entity, typeinfo[3], id)
+                end
+            end
         end
     end
 end
 
 function inject_item(btype, name)
+    local id = -1
     for _,v in ipairs(itemdefs.all) do
         if v.id == name then
             print('Itemdef '..name..' already exists.')
-            return
+            id = v.subtype
         end
     end
 
-    print('Injecting item '..name)
-    changed = true
+    if id != -1 then
+        print('Injecting item '..name)
+        changed = true
 
-    local typeinfo = item_types[btype]
-    local vec = typeinfo[2]
-    local id = #vec
+        local typeinfo = item_types[btype]
+        local vec = typeinfo[2]
+        id = #vec
 
-    vec:insert('#', {
-        new = typeinfo[1],
-        id = name,
-        subtype = id,
-        name = name,
-        name_plural = name,
-    })
+        vec:insert('#', {
+            new = typeinfo[1],
+            id = name,
+            subtype = id,
+            name = name,
+            name_plural = name,
+        })
 
-    itemdefs.all:insert('#', vec[id])
+        itemdefs.all:insert('#', vec[id])
+    end
 
-    add_to_dwarf_civs(btype, id)
+    add_to_civs(btype, id)
 end
 
 local args = {...}
@@ -170,8 +216,20 @@ local mode = nil
 local ops = {}
 
 for _,kv in ipairs(args) do
-    if mode and string.match(kv, '^[%u_]+$') then
+    if kv == 'civtype' then
+        mode = 'civtype'
+    elseif mode == 'civtype' then
+        if kv == 'END' then
+            mode = ''
+        else
+            table.insert(civtypes, kv)
+        end
+    elseif mode and string.match(kv, '^[%u_]+$') then
         table.insert(ops, curry(mode, kv))
+    elseif kv == 'inorganic' then
+        mode = inject_inorganic
+    elseif kv == 'plant' then
+        mode = inject_plant
     elseif kv == 'reaction' then
         mode = inject_reaction
     elseif building_types[kv] then
