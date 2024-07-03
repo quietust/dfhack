@@ -69,11 +69,34 @@ command_result df_regrass (color_ostream &out, vector <string> & parameters)
                 break;
             }
         }
-        if(!grev)
+        if(!grev && !world->raws.plants.grasses.size())
         {
-            // in this worst case we should check other blocks, create a new event etc
-            // but looking at some maps that should happen very very rarely if at all
-            // a standard map block seems to always have up to 10 grass events we can refresh
+            // If we didn't find any grass events, then at least create "fake" grass
+            // for old fortresses which predated the introduction of custom grass types
+            // so that new saplings and shrubs are capable of growing on the surface
+            for (int y = 0; y < 16; y++)
+            {
+                for (int x = 0; x < 16; x++)
+                {
+                    if (   tileShape(cur->tiletype[x][y]) != tiletype_shape::FLOOR
+                        || cur->designation[x][y].bits.subterranean
+                        || cur->occupancy[x][y].bits.building
+                        || cur->occupancy[x][y].bits.no_grow)
+                        continue;
+
+                    // don't touch furrowed tiles (dirt roads made on soil)
+                    if(tileSpecial(cur->tiletype[x][y]) == tiletype_special::FURROWED)
+                        continue;
+
+                    int mat = tileMaterial(cur->tiletype[x][y]);
+                    if (   mat != tiletype_material::SOIL
+                        && mat != tiletype_material::ASHES) // refill ashes too
+                        continue;
+
+                    cur->tiletype[x][y] = findRandomVariant((rand() & 1) ? tiletype::GrassLightFloor1 : tiletype::GrassDarkFloor1);
+                    count++;
+                }
+            }
             continue;
         }
 
@@ -81,25 +104,25 @@ command_result df_regrass (color_ostream &out, vector <string> & parameters)
         {
             for (int x = 0; x < 16; x++)
             {
-                if (   tileShape(cur->tiletype[x][y]) != tiletype_shape::FLOOR
-                    || cur->designation[x][y].bits.subterranean
-                    || cur->occupancy[x][y].bits.building
-                    || cur->occupancy[x][y].bits.no_grow)
+                // don't touch walls, tiles under buildings, or ones where grass isn't supposed to grow
+                if (   tileShape(cur->tiletype[x][y]) == tiletype_shape::WALL || cur->occupancy[x][y].bits.building || cur->occupancy[x][y].bits.no_grow)
                     continue;
 
                 // don't touch furrowed tiles (dirt roads made on soil)
                 if(tileSpecial(cur->tiletype[x][y]) == tiletype_special::FURROWED)
                     continue;
 
-                int mat = tileMaterial(cur->tiletype[x][y]);
+                auto mat = tileMaterial(cur->tiletype[x][y]);
                 if (   mat != tiletype_material::SOIL
                     && mat != tiletype_material::GRASS_DARK  // refill existing grass, too
-                    && mat != tiletype_material::GRASS_LIGHT // refill existing grass, too
+                    && mat != tiletype_material::GRASS_LIGHT
+                    && mat != tiletype_material::GRASS_DRY
+                    && mat != tiletype_material::GRASS_DEAD
                     )
                     continue;
 
-
                 // max = set amounts of all grass events on that tile to 100
+                bool regrew = false;
                 if(max)
                 {
                     for(size_t e=0; e<cur->block_events.size(); e++)
@@ -110,13 +133,13 @@ command_result df_regrass (color_ostream &out, vector <string> & parameters)
                         {
                             df::block_square_event_grassst * gr_ev = (df::block_square_event_grassst *)blev;
                             gr_ev->amount[x][y] = 100;
+                            regrew = true;
                         }
                     }
                 }
                 else
                 {
                     // try to find the 'original' event
-                    bool regrew = false;
                     for(size_t e=0; e<cur->block_events.size(); e++)
                     {
                         df::block_square_event * blev = cur->block_events[e];
@@ -147,11 +170,23 @@ command_result df_regrass (color_ostream &out, vector <string> & parameters)
                                 gr_evs.push_back(gr_ev);
                             }
                         }
-                        int r = rand() % gr_evs.size();
-                        gr_evs[r]->amount[x][y]=100;
+                        if (gr_evs.size() > 0)
+                        {
+                            int r = rand() % gr_evs.size();
+                            gr_evs[r]->amount[x][y]=100;
+                            regrew = true;
+                        }
                     }
                 }
-                cur->tiletype[x][y] = findRandomVariant((rand() & 1) ? tiletype::GrassLightFloor1 : tiletype::GrassDarkFloor1);
+                // If it was soil and we regrew it, turn it into grass
+                if (regrew && mat == tiletype_material::SOIL)
+                    cur->tiletype[x][y] = DFHack::findRandomVariant(DFHack::findTileType(tileShape(cur->tiletype[x][y]),
+                        (rand() & 1) ? tiletype_material::GRASS_LIGHT : tiletype_material::GRASS_DARK,
+                        tiletype_variant::NONE, tiletype_special::NORMAL, DFHack::TileDirection()));
+                // If it was grass and we didn't regrow it (because there was no grass event), turn it into soil so it can regrow naturally
+                else if (!regrew && mat != tiletype_material::SOIL)
+                    cur->tiletype[x][y] = DFHack::findRandomVariant(DFHack::findTileType(tileShape(cur->tiletype[x][y]),
+                        tiletype_material::SOIL, tiletype_variant::NONE, tiletype_special::NORMAL, DFHack::TileDirection()));
                 count++;
             }
         }
