@@ -37,6 +37,8 @@
 #include "df/squad_order_trainst.h"
 #include "df/buildreq.h"
 #include "df/gamest.h"
+#include "df/building_drawbuffer.h"
+#include "df/building_bridgest.h"
 #include "df/building_trapst.h"
 #include "df/building_workshopst.h"
 #include "df/item_actual.h"
@@ -70,7 +72,6 @@
 #include "df/activity_event_individual_skill_drillst.h"
 #include "df/activity_event_skill_demonstrationst.h"
 #include "df/activity_event_sparringst.h"
-//#include "df/building_hivest.h"
 
 #include <stdlib.h>
 #include <unordered_map>
@@ -80,16 +81,19 @@
 #include "tweaks/block-labors.h"
 #include "tweaks/civ-agreement-ui.h"
 #include "tweaks/craft-age-wear.h"
+#include "tweaks/drawbridge-tiles.h"
 #include "tweaks/eggs-fertile.h"
 #include "tweaks/embark-profile-name.h"
 #include "tweaks/fast-heat.h"
 #include "tweaks/fast-trade.h"
+#include "tweaks/flask-contents.h"
 #include "tweaks/fps-min.h"
 #include "tweaks/import-priority-category.h"
 #include "tweaks/kitchen-keys.h"
 #include "tweaks/kitchen-prefs-color.h"
 #include "tweaks/military-assign.h"
 #include "tweaks/nestbox-color.h"
+#include "tweaks/partial-items.h"
 #include "tweaks/shift-8-scroll.h"
 #include "tweaks/stable-cursor.h"
 #include "tweaks/title-start-rename.h"
@@ -176,6 +180,8 @@ DFhackCExport command_result plugin_init (color_ostream &out, std::vector <Plugi
         "    Fixes overlapping text on the \"view agreement\" screen\n"
         "  tweak craft-age-wear [disable]\n"
         "    Makes cloth and leather items wear out at the correct rate (bug 6003).\n"
+        "  tweak drawbridge-tiles [disable]\n"
+        "    Draws raised bridges with distinct tiles.\n"
         "  tweak embark-profile-name [disable]\n"
         "    Allows the use of lowercase letters when saving embark profiles\n"
         "  tweak eggs-fertile [disable]\n"
@@ -187,6 +193,8 @@ DFhackCExport command_result plugin_init (color_ostream &out, std::vector <Plugi
         "  tweak fast-trade [disable]\n"
         "    Makes Shift-Enter in the Move Goods to Depot and Trade screens select\n"
         "    the current item (fully, in case of a stack), and scroll down one line.\n"
+        "  tweak flask-contents [disable]\n"
+        "    Names flasks according to their contents, just like bins and barrels.\n"
         "  tweak fps-min [disable]\n"
         "    Fixes the in-game minimum FPS setting (bug 6277)\n"
         "  tweak hide-priority [disable]\n"
@@ -207,6 +215,8 @@ DFhackCExport command_result plugin_init (color_ostream &out, std::vector <Plugi
         "    Preserve list order and cursor position when assigning to squad,\n"
         "    i.e. stop the rightmost list of the Positions page of the military\n"
         "    screen from constantly jumping to the top.\n"
+        "  tweak partial-items [disable]\n"
+        "    Displays a percentage indicator on partially-used hospital supplies\n"
         "  tweak shift-8-scroll [disable]\n"
         "    Gives Shift+8 (or *) priority when scrolling menus, instead of \n"
         "    scrolling the map\n"
@@ -233,6 +243,8 @@ DFhackCExport command_result plugin_init (color_ostream &out, std::vector <Plugi
 
     TWEAK_HOOK("craft-age-wear", craft_age_wear_hook, ageItem);
 
+    TWEAK_HOOK("drawbridge-tiles", drawbridge_tiles_hook, drawBuilding);
+
     TWEAK_HOOK("eggs-fertile", egg_fertile_hook, render);
 
     TWEAK_HOOK("embark-profile-name", embark_profile_name_hook, feed);
@@ -243,6 +255,8 @@ DFhackCExport command_result plugin_init (color_ostream &out, std::vector <Plugi
 
     TWEAK_HOOK("fast-trade", fast_trade_assign_hook, feed);
     TWEAK_HOOK("fast-trade", fast_trade_select_hook, feed);
+
+    TWEAK_HOOK("flask-contents", flask_contents_hook, getItemDescription);
 
     TWEAK_ONUPDATE_HOOK("fps-min", fps_min_hook);
 
@@ -259,6 +273,13 @@ DFhackCExport command_result plugin_init (color_ostream &out, std::vector <Plugi
     TWEAK_HOOK("military-stable-assign", military_assign_hook, feed);
 
     TWEAK_HOOK("nestbox-color", nestbox_color_hook, drawBuilding);
+
+    TWEAK_HOOK("partial-items", partial_items_hook_bar, getItemDescription);
+    TWEAK_HOOK("partial-items", partial_items_hook_drink, getItemDescription);
+    TWEAK_HOOK("partial-items", partial_items_hook_liquid_misc, getItemDescription);
+    TWEAK_HOOK("partial-items", partial_items_hook_powder_misc, getItemDescription);
+    TWEAK_HOOK("partial-items", partial_items_hook_cloth, getItemDescription);
+    TWEAK_HOOK("partial-items", partial_items_hook_thread, getItemDescription);
 
     TWEAK_HOOK("shift-8-scroll", shift_8_scroll_hook, feed);
 
