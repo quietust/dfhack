@@ -98,6 +98,8 @@ void help( color_ostream & out, std::vector<std::string> &commands, int start, i
             << " Subterranean / st: set subterranean flag" << std::endl
             << " Skyview / sv: set skyview flag" << std::endl
             << " Aquifer / aqua: set aquifer flag" << std::endl
+            << " Stagnant / stag: set stagnant flag" << std::endl
+            << " Saltwater / salt: set saltwater flag" << std::endl
             << " Stone: paint specific stone material" << std::endl
             << " Veintype: use specific vein type for stone" << std::endl
             << "See help [option] for more information" << std::endl;
@@ -168,6 +170,16 @@ void help( color_ostream & out, std::vector<std::string> &commands, int start, i
         out << "Available aquifer flags:" << std::endl
             << " ANY, 0, 1" << std::endl;
     }
+    else if (option == "stagnant" || option == "stag")
+    {
+        out << "Available stagnant flags:" << std::endl
+            << " ANY, 0, 1" << std::endl;
+    }
+    else if (option == "saltwater" || option == "salt")
+    {
+        out << "Available saltwater flags:" << std::endl
+            << " ANY, 0, 1" << std::endl;
+    }
     else if (option == "stone")
     {
         out << "The stone option allows painting any specific stone material." << std::endl
@@ -198,6 +210,8 @@ struct TileType
     int subterranean;
     int skyview;
     int aquifer;
+    int stagnant;
+    int saltwater;
     int stone_material;
     df::inclusion_type vein_type;
 
@@ -218,6 +232,8 @@ struct TileType
         subterranean = -1;
         skyview = -1;
         aquifer = -1;
+        stagnant = -1;
+        saltwater = -1;
         stone_material = -1;
         vein_type = inclusion_type::CLUSTER;
     }
@@ -226,7 +242,7 @@ struct TileType
     {
         return shape == -1 && material == -1 && special == -1 && variant == -1
             && dig == -1 && hidden == -1 && light == -1 && subterranean == -1
-            && skyview == -1 && aquifer == -1 && stone_material == -1;
+            && skyview == -1 && aquifer == -1 && stagnant == -1 && saltwater == -1 && stone_material == -1;
     }
 
     inline bool matches(const df::tiletype source,
@@ -247,6 +263,8 @@ struct TileType
         rv &= (subterranean == -1 || (subterranean != 0) == des.bits.subterranean);
         rv &= (skyview == -1 || (skyview != 0) == des.bits.outside);
         rv &= (aquifer == -1 || (aquifer != 0) == des.bits.water_table);
+        rv &= (stagnant == -1 || (stagnant != 0) == des.bits.water_stagnant);
+        rv &= (saltwater == -1 || (saltwater != 0) == des.bits.water_salt);
         return rv;
     }
 };
@@ -376,6 +394,32 @@ std::ostream &operator<<(std::ostream &stream, const TileType &paint)
         }
 
         stream << (paint.aquifer ? "AQUIFER" : "NO AQUIFER");
+        used = true;
+        needSpace = true;
+    }
+
+    if (paint.stagnant >= 0)
+    {
+        if (needSpace)
+        {
+            stream << " ";
+            needSpace = false;
+        }
+
+        stream << (paint.stagnant ? "STAGNANT" : "NOT STAGNANT");
+        used = true;
+        needSpace = true;
+    }
+
+    if (paint.saltwater >= 0)
+    {
+        if (needSpace)
+        {
+            stream << " ";
+            needSpace = false;
+        }
+
+        stream << (paint.saltwater ? "SALTWATER" : "FRESHWATER");
         used = true;
         needSpace = true;
     }
@@ -662,6 +706,30 @@ bool processTileType(color_ostream & out, TileType &paint, std::vector<std::stri
             out << "Unknown aquifer flag: " << value << std::endl;
         }
     }
+    else if (option == "stagnant" || option == "stag")
+    {
+        if (valInt >= -1 && valInt < 2)
+        {
+            paint.stagnant = valInt;
+            found = true;
+        }
+        else
+        {
+            out << "Unknown stagnant flag: " << value << std::endl;
+        }
+    }
+    else if (option == "saltwater" || option == "salt")
+    {
+        if (valInt >= -1 && valInt < 2)
+        {
+            paint.saltwater = valInt;
+            found = true;
+        }
+        else
+        {
+            out << "Unknown saltwater flag: " << value << std::endl;
+        }
+    }
     else if (option == "all" || option == "a")
     {
         loc--;
@@ -852,6 +920,16 @@ command_result executePaintJob(color_ostream &out)
         if (paint.aquifer > -1)
         {
             des.bits.water_table = paint.aquifer;
+        }
+
+        if (paint.stagnant > -1)
+        {
+            des.bits.water_stagnant = paint.stagnant;
+        }
+
+        if (paint.saltwater > -1)
+        {
+            des.bits.water_salt = paint.saltwater;
         }
 
         // Remove liquid from walls, etc
