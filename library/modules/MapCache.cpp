@@ -281,9 +281,8 @@ bool MapExtras::Block::setVeinMaterialAt(df::coord2d pos, int16_t mat, df::inclu
 
     pos = pos & 15;
     auto &cur_mat = basemats->veinmat[pos.x][pos.y];
-    auto &cur_type = basemats->veintype[pos.x][pos.y];
 
-    if (cur_mat == mat && (mat < 0 || cur_type == type))
+    if (cur_mat == mat)
         return true;
 
     if (mat >= 0)
@@ -299,7 +298,6 @@ bool MapExtras::Block::setVeinMaterialAt(df::coord2d pos, int16_t mat, df::inclu
 
     dirty_veins = true;
     cur_mat = mat;
-    cur_type = (uint8_t)type;
     basemats->vein_dirty.setassignment(pos, true);
 
     if (tileMaterial(tiles->base_tiles[pos.x][pos.y]) == MINERAL)
@@ -569,7 +567,6 @@ void MapExtras::Block::ParseBasemats(TileInfo *tiles, BasematInfo *bmats)
     info.prepare(this);
 
     COPY(bmats->veinmat, info.veinmats);
-    COPY(bmats->veintype, info.veintype);
 
     for (int x = 0; x < 16; x++)
     {
@@ -601,9 +598,8 @@ void MapExtras::Block::BasematInfo::set_base_mat(TileInfo *tiles, df::coord2d po
 void MapExtras::Block::WriteVeins(TileInfo *tiles, BasematInfo *bmats)
 {
     // Classify modified tiles into distinct buckets
-    typedef std::pair<int, df::inclusion_type> t_vein_key;
-    std::map<t_vein_key, df::tile_bitmask> added;
-    std::set<t_vein_key> discovered;
+    std::map<int, df::tile_bitmask> added;
+    std::set<int> discovered;
 
     for (int y = 0; y < 16; y++)
     {
@@ -620,7 +616,7 @@ void MapExtras::Block::WriteVeins(TileInfo *tiles, BasematInfo *bmats)
             int matidx = bmats->veinmat[x][y];
             if (matidx >= 0)
             {
-                t_vein_key key(matidx, (df::inclusion_type)bmats->veintype[x][y]);
+                int key = matidx;
 
                 added[key].setassignment(x,y,true);
                 if (!designation[x][y].bits.hidden)
@@ -641,7 +637,7 @@ void MapExtras::Block::WriteVeins(TileInfo *tiles, BasematInfo *bmats)
         vein->tile_bitmask -= bmats->vein_dirty;
 
         // Then add new if there are any matching ones
-        t_vein_key key(vein->inorganic_mat, BlockInfo::getVeinType(vein->flags));
+        int key = vein->inorganic_mat;
 
         if (added.count(key))
         {
@@ -670,10 +666,9 @@ void MapExtras::Block::WriteVeins(TileInfo *tiles, BasematInfo *bmats)
 
         block->block_events.push_back(vein);
 
-        vein->inorganic_mat = it->first.first;
+        vein->inorganic_mat = it->first;
         vein->tile_bitmask = it->second;
         vein->flags.bits.discovered = discovered.count(it->first)>0;
-        BlockInfo::setVeinType(vein->flags, it->first.second);
     }
 
     bmats->vein_dirty.clear();
@@ -734,7 +729,7 @@ void MapExtras::BlockInfo::prepare(Block *mblock)
     parent = mblock->getParent();
     column = Maps::getBlockColumn((block->map_pos.x / 48) * 3, (block->map_pos.y / 48) * 3);
 
-    SquashVeins(block, veinmats, veintype);
+    SquashVeins(block, veinmats);
     SquashGrass(block, grass);
 
     for (size_t i = 0; i < block->plants.size(); i++)
@@ -873,43 +868,11 @@ t_matpair MapExtras::BlockInfo::getBaseMaterial(df::tiletype tt, df::coord2d pos
     return rv;
 }
 
-df::inclusion_type MapExtras::BlockInfo::getVeinType(DFVeinFlags &flags)
-{
-    using namespace df::enums::inclusion_type;
-
-    if (flags.bits.cluster_small)
-        return CLUSTER_SMALL;
-    if (flags.bits.cluster_one)
-        return CLUSTER_ONE;
-    if (flags.bits.vein)
-        return VEIN;
-    if (flags.bits.cluster)
-        return CLUSTER;
-
-    return df::inclusion_type(0);
-}
-
-void MapExtras::BlockInfo::setVeinType(DFVeinFlags &info, df::inclusion_type type)
-{
-    using namespace df::enums::inclusion_type;
-
-    info.bits.cluster = info.bits.vein = info.bits.cluster_small = info.bits.cluster_one = false;
-
-    switch (type) {
-        case VEIN:          info.bits.vein = true; break;
-        case CLUSTER:       info.bits.cluster = true; break;
-        case CLUSTER_SMALL: info.bits.cluster_small = true; break;
-        case CLUSTER_ONE:   info.bits.cluster_one = true; break;
-        default: break;
-    }
-}
-
-void MapExtras::BlockInfo::SquashVeins(df::map_block *mb, t_blockmaterials & materials, t_veintype &veintype)
+void MapExtras::BlockInfo::SquashVeins(df::map_block *mb, t_blockmaterials & materials)
 {
     std::vector <df::block_square_event_mineralst *> veins;
     Maps::SortBlockEvents(mb,&veins);
     memset(materials,-1,sizeof(materials));
-    memset(veintype, 0, sizeof(t_veintype));
 
     for (uint32_t x = 0;x<16;x++) for (uint32_t y = 0; y< 16;y++)
     {
@@ -918,7 +881,6 @@ void MapExtras::BlockInfo::SquashVeins(df::map_block *mb, t_blockmaterials & mat
             if (veins[i]->getassignment(x,y))
             {
                 materials[x][y] = veins[i]->inorganic_mat;
-                veintype[x][y] = (uint8_t)getVeinType(veins[i]->flags);
             }
         }
     }

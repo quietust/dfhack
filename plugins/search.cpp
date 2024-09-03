@@ -949,7 +949,7 @@ private:
 
     virtual vector<df::item*> *get_primary_list()
     {
-        return &viewscreen->items;
+        return &viewscreen->i_list.l_item;
     }
 
 

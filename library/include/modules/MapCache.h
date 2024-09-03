@@ -65,7 +65,6 @@ struct BiomeInfo {
     int16_t layer_stone[MAX_LAYERS];
 };
 
-typedef uint8_t t_veintype[16][16];
 typedef df::tiletype t_tilearr[16][16];
 
 class BlockInfo
@@ -83,7 +82,6 @@ public:
 
     typedef df::block_square_event_mineralst::T_flags DFVeinFlags;
 
-    t_veintype veintype;
     t_blockmaterials veinmats;
     t_blockmaterials grass;
     std::map<df::coord,df::plant*> plants;
@@ -102,7 +100,7 @@ public:
     static df::inclusion_type getVeinType(DFVeinFlags &flags);
     static void setVeinType(DFVeinFlags &flags, df::inclusion_type type);
 
-    static void SquashVeins(df::map_block *mb, t_blockmaterials & materials, t_veintype &veintype);
+    static void SquashVeins(df::map_block *mb, t_blockmaterials & materials);
     static void SquashFrozenLiquids (df::map_block *mb, tiletypes40d & frozen);
     static void SquashRocks (df::map_block *mb, t_blockmaterials & materials,
                              std::vector< std::vector <int16_t> > * layerassign);
@@ -166,12 +164,6 @@ public:
     {
         if (!basemats) init_tiles(true);
         return index_tile<int16_t>(basemats->veinmat,p);
-    }
-    /// Vein type at pos (even if there is no vein tile)
-    df::inclusion_type veinTypeAt(df::coord2d p)
-    {
-        if (!basemats) init_tiles(true);
-        return (df::inclusion_type)index_tile<uint8_t>(basemats->veintype,p);
     }
 
     /** Sets the vein material at the specified tile position.
@@ -395,7 +387,6 @@ private:
         t_blockmaterials mat_index;
 
         df::tile_bitmask vein_dirty;
-        t_veintype       veintype;
         t_blockmaterials veinmat;
 
         BasematInfo();

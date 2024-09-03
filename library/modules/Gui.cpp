@@ -82,7 +82,7 @@ using namespace DFHack;
 #include "df/interfacest.h"
 #include "df/graphicst.h"
 #include "df/layer_object_listst.h"
-#include "df/assign_trade_status.h"
+#include "df/tradegoodslistst.h"
 #include "df/announcement_flags.h"
 #include "df/announcements.h"
 #include "df/game_mode.h"
@@ -293,9 +293,7 @@ DEFINE_GET_FOCUS_STRING_HANDLER(dwarfmode)
         break;
 
     case Burrows:
-        if (plotinfo->burrows.in_confirm_delete)
-            focus += "/ConfirmDelete";
-        else if (plotinfo->burrows.in_add_units_mode)
+        if (plotinfo->burrows.in_add_units_mode)
             focus += "/AddUnits";
         else if (plotinfo->burrows.in_edit_name_mode)
             focus += "/EditName";
@@ -827,7 +825,7 @@ df::item *Gui::getAnyItem(df::viewscreen *top)
 
         int idx = vector_get(screen->lists[list_idx], list2->cursor, -1);
         if (auto info = vector_get(screen->info, idx))
-            return info->item;
+            return info->it;
 
         return NULL;
     }
@@ -843,7 +841,7 @@ df::item *Gui::getAnyItem(df::viewscreen *top)
     if (VIRTUAL_CAST_VAR(screen, df::viewscreen_storesst, top))
     {
         if (screen->in_right_list && !screen->in_group_mode)
-            return vector_get(screen->items, screen->item_cursor);
+            return vector_get(screen->i_list.l_item, screen->item_cursor);
 
         return NULL;
     }

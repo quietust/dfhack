@@ -598,9 +598,9 @@ static void index_boxes(df::building *root, ammo_box_set &group, int squad_id)
         if (id < 0 || id == squad_id)
         {
             //color_ostream_proxy out(Core::getInstance().getConsole());
-            //out.print("%08x %d\n", unsigned(root), root->getFreeCapacity(true));
+            //out.print("%08x %d\n", unsigned(root), root->getFreeCapacity(true, true));
 
-            group[root->getFreeCapacity(true)].insert(root);
+            group[root->getFreeCapacity(true, true)].insert(root);
         }
     }
 
@@ -625,7 +625,7 @@ static bool try_store_ammo(df::item *item, ammo_box_set &group)
             if (try_store_item(bld, item))
             {
                 it->second.erase(bld);
-                group[bld->getFreeCapacity(true)].insert(bld);
+                group[bld->getFreeCapacity(true, true)].insert(bld);
                 return true;
             }
         }

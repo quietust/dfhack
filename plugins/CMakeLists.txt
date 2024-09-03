@@ -63,7 +63,7 @@ TARGET_LINK_LIBRARIES(buildingplan-lib dfhack)
 # Plugins
 OPTION(BUILD_SUPPORTED "Build the supported plugins (reveal, probe, etc.)." ON)
 if (BUILD_SUPPORTED)
-    DFHACK_PLUGIN(3dveins 3dveins.cpp)
+#    DFHACK_PLUGIN(3dveins 3dveins.cpp)
     DFHACK_PLUGIN(add-spatter add-spatter.cpp)
 #    DFHACK_PLUGIN(advtools advtools.cpp)
     DFHACK_PLUGIN(autochop autochop.cpp)

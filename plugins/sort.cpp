@@ -23,7 +23,7 @@
 #include "df/viewscreen_petst.h"
 #include "df/viewscreen_storesst.h"
 #include "df/layer_object_listst.h"
-#include "df/assign_trade_status.h"
+#include "df/tradegoodslistst.h"
 
 #include "MiscUtils.h"
 
@@ -475,7 +475,7 @@ DEFINE_SORT_HANDLER(item_sorters, layer_assigntrade, "/Items", bring)
 
     std::vector<df::item*> items;
     for (size_t i = 0; i < vec.size(); i++)
-        items.push_back(bring->info[vec[i]]->item);
+        items.push_back(bring->info[vec[i]]->it);
 
     if (compute_order(*pout, L, top, &order, items))
     {
@@ -488,10 +488,10 @@ DEFINE_SORT_HANDLER(item_sorters, stores, "/Items", stocks)
 {
     PARSE_SPEC("items", parameters);
 
-    if (compute_order(*pout, L, top, &order, stocks->items))
+    if (compute_order(*pout, L, top, &order, stocks->i_list.l_item))
     {
         reorder_cursor(&stocks->item_cursor, order);
-        reorder_vector(&stocks->items, order);
+        reorder_vector(&stocks->i_list.l_item, order);
     }
 }
 
