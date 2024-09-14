@@ -39,6 +39,8 @@
 #include "df/gamest.h"
 #include "df/building_drawbuffer.h"
 #include "df/building_bridgest.h"
+#include "df/building_doorst.h"
+#include "df/building_floodgatest.h"
 #include "df/building_trapst.h"
 #include "df/building_workshopst.h"
 #include "df/item_actual.h"
@@ -88,6 +90,7 @@
 #include "tweaks/fast-trade.h"
 #include "tweaks/flask-contents.h"
 #include "tweaks/fps-min.h"
+#include "tweaks/gate-tiles.h"
 #include "tweaks/import-priority-category.h"
 #include "tweaks/kitchen-keys.h"
 #include "tweaks/kitchen-prefs-color.h"
@@ -165,9 +168,9 @@ DFhackCExport command_result plugin_init (color_ostream &out, std::vector <Plugi
         "  tweak stable-cursor [disable]\n"
         "    Keeps exact position of dwarfmode cursor during exits to main menu.\n"
         "    E.g. allows switching between t/q/k/d without losing position.\n"
-        /*"  tweak fix-dimensions [disable]\n"
+        "  tweak fix-dimensions [disable]\n"
         "    Fixes subtracting small amount of thread/cloth/liquid from a stack\n"
-        "    by splitting the stack and subtracting from the remaining single item.\n"*/
+        "    by splitting the stack and subtracting from the remaining single item.\n"
         "  tweak adamantine-cloth-wear [disable]\n"
         "    Stops adamantine clothing from wearing out while being worn (bug 6481).\n"
         "  tweak advmode-contained [disable]\n"
@@ -197,6 +200,8 @@ DFhackCExport command_result plugin_init (color_ostream &out, std::vector <Plugi
         "    Names flasks according to their contents, just like bins and barrels.\n"
         "  tweak fps-min [disable]\n"
         "    Fixes the in-game minimum FPS setting (bug 6277)\n"
+        "  tweak gate-tiles [disable]\n"
+        "    Fixes the appearance of built metal doors and floodgates (bug 2589)\n"
         "  tweak hide-priority [disable]\n"
         "    Adds an option to hide designation priority indicators\n"
         "  tweak import-priority-category [disable]\n"
@@ -224,8 +229,8 @@ DFhackCExport command_result plugin_init (color_ostream &out, std::vector <Plugi
         "    Adds a safe rename option to the title screen \"Start Playing\" menu\n"
         "  tweak tradereq-pet-gender [disable]\n"
         "    Displays the gender of pets in the trade request list\n"
-//        "  tweak military-training [disable]\n"
-//        "    Speed up melee squad training, removing inverse dependency on unit count.\n"
+        "  tweak military-training [disable]\n"
+        "    Speed up melee squad training, removing inverse dependency on unit count.\n"
     ));
 
     TWEAK_HOOK("adamantine-cloth-wear", adamantine_cloth_wear_armor_hook, incWearTimer);
@@ -259,6 +264,9 @@ DFhackCExport command_result plugin_init (color_ostream &out, std::vector <Plugi
     TWEAK_HOOK("flask-contents", flask_contents_hook, getItemDescription);
 
     TWEAK_ONUPDATE_HOOK("fps-min", fps_min_hook);
+
+    TWEAK_HOOK("gate-tiles", door_tile_hook, drawBuilding);
+    TWEAK_HOOK("gate-tiles", floodgate_tile_hook, drawBuilding);
 
     TWEAK_HOOK("import-priority-category", takerequest_hook, feed);
     TWEAK_HOOK("import-priority-category", takerequest_hook, render);
@@ -455,15 +463,14 @@ struct dimension_cloth_hook : df::item_clothst {
 
 IMPLEMENT_VMETHOD_INTERPOSE(dimension_cloth_hook, subtractDimension);
 
-/*
 // Unit updates are executed based on an action divisor variable,
 // which is computed from the alive unit count and has range 10-100.
 static int adjust_unit_divisor(int value) {
-    return value*10/DF_GLOBAL_FIELD(ui, unit_action_divisor, 10);
+    return value*10/plotinfo->unit_action_divisor;
 }
 
 static bool can_spar(df::unit *unit) {
-    return unit->counters2.exhaustion <= 2000 && // actually 4000, but leave a gap
+    return unit->counters.exhaustion <= 2000 && // actually 4000, but leave a gap
            (unit->status2.limbs_grasp_count > 0 || unit->status2.limbs_grasp_max == 0) &&
            (!unit->health || (unit->health->flags.whole&0x7FF) == 0) &&
            (!unit->job.current_job || unit->job.current_job->job_type != job_type::Rest);
@@ -548,7 +555,7 @@ struct military_training_ct_hook : df::activity_event_combat_trainingst {
                 {
                     // Sparring has a problem in that all of its participants decrement
                     // the countdown variable. Fix this by multiplying it by the member count.
-                    sp->countdown = sp->countdown * sp->participants.units.size();
+                    sp->countdown = sp->countdown * sp->participants.participant_unit.size();
                 }
                 else if (auto sd = strict_virtual_cast<df::activity_event_skill_demonstrationst>(event))
                 {
@@ -557,7 +564,7 @@ struct military_training_ct_hook : df::activity_event_combat_trainingst {
                     sd->wait_countdown = adjust_unit_divisor(sd->wait_countdown);
 
                     // Check if the game selected the most skilled unit as the teacher
-                    auto &units = sd->participants.units;
+                    auto &units = sd->participants.participant_unit;
                     int maxv = -1, cur_xp = -1, minv = 0;
                     int best = -1;
                     size_t spar = 0;
@@ -618,7 +625,7 @@ struct military_training_ct_hook : df::activity_event_combat_trainingst {
                                   sd->unit_id, cur_xp, units[best], maxv, maxv-minv);
 #endif
 
-                        sd->hist_figure_id = sd->participants.histfigs[best];
+                        sd->hist_figure_id = sd->participants.participant_hf[best];
                         sd->unit_id = units[best];
                     }
                     else
@@ -634,9 +641,7 @@ struct military_training_ct_hook : df::activity_event_combat_trainingst {
         }
     }
 };
-*/
 
-/*
 IMPLEMENT_VMETHOD_INTERPOSE(military_training_ct_hook, process);
 
 struct military_training_sd_hook : df::activity_event_skill_demonstrationst {
@@ -663,7 +668,7 @@ template<class T>
 bool is_done(T *event, df::unit *unit)
 {
     return event->flags.bits.dismissed ||
-           binsearch_index(event->participants.units, unit->id) < 0;
+           binsearch_index(event->participants.participant_unit, unit->id) < 0;
 }
 
 struct military_training_sp_hook : df::activity_event_sparringst {
@@ -674,7 +679,7 @@ struct military_training_sp_hook : df::activity_event_sparringst {
         INTERPOSE_NEXT(process)(unit);
 
         // Since there are no counters to fix, repeat the call
-        int cnt = (DF_GLOBAL_FIELD(ui, unit_action_divisor, 10)+5) / 10;
+        int cnt = (plotinfo->unit_action_divisor+5) / 10;
         for (int i = 1; i < cnt && !is_done(this, unit); i++)
             INTERPOSE_NEXT(process)(unit);
     }
@@ -690,14 +695,13 @@ struct military_training_id_hook : df::activity_event_individual_skill_drillst {
         INTERPOSE_NEXT(process)(unit);
 
         // Since there are no counters to fix, repeat the call
-        int cnt = (DF_GLOBAL_FIELD(ui, unit_action_divisor, 10)+5) / 10;
+        int cnt = (plotinfo->unit_action_divisor+5) / 10;
         for (int i = 1; i < cnt && !is_done(this, unit); i++)
             INTERPOSE_NEXT(process)(unit);
     }
 };
 
 IMPLEMENT_VMETHOD_INTERPOSE(military_training_id_hook, process);
-*/
 
 static void enable_hook(color_ostream &out, VMethodInterposeLinkBase &hook, vector <string> &parameters)
 {
@@ -843,22 +847,21 @@ static command_result tweak(color_ostream &out, vector <string> &parameters)
         enable_tweak(cmd, out, parameters);
         return CR_OK;
     }
-    /*else if (cmd == "fix-dimensions")
+    else if (cmd == "fix-dimensions")
     {
         enable_hook(out, INTERPOSE_HOOK(dimension_liquid_hook, subtractDimension), parameters);
         enable_hook(out, INTERPOSE_HOOK(dimension_powder_hook, subtractDimension), parameters);
         enable_hook(out, INTERPOSE_HOOK(dimension_bar_hook, subtractDimension), parameters);
         enable_hook(out, INTERPOSE_HOOK(dimension_thread_hook, subtractDimension), parameters);
         enable_hook(out, INTERPOSE_HOOK(dimension_cloth_hook, subtractDimension), parameters);
-    }*/
-/*
+    }
     else if (cmd == "military-training")
     {
         enable_hook(out, INTERPOSE_HOOK(military_training_ct_hook, process), parameters);
         enable_hook(out, INTERPOSE_HOOK(military_training_sd_hook, process), parameters);
         enable_hook(out, INTERPOSE_HOOK(military_training_sp_hook, process), parameters);
         enable_hook(out, INTERPOSE_HOOK(military_training_id_hook, process), parameters);
-    }*/
+    }
     else
     {
         return enable_tweak(cmd, out, parameters);

@@ -9,7 +9,6 @@ caused by `autodump` bugs or other hacking mishaps. Checks that:
 
 #. Item has ``flags.on_ground`` <=> it is in the correct block item list
 #. A tile has items in block item list <=> it has ``occupancy.item``
-#. The block item lists are sorted
 
 =end]]
 local utils = require 'utils'
@@ -28,21 +27,11 @@ function check_block_items(fix)
         local bx,by,bz = pos2xyz(block.map_pos)
 
         -- Scan the block item vector
-        local last_id = nil
-        local resort = false
 
         for _,id in ipairs(block.items) do
             local item = df.item.find(id)
             local ix,iy,iz = pos2xyz(item.pos)
             local dx,dy,dz = ix-bx,iy-by,iz-bz
-
-            -- Check sorted order
-            if last_id and last_id >= id then
-                print(bx,by,bz,last_id,id,'block items not sorted')
-                resort = true
-            else
-                last_id = id
-            end
 
             -- Check valid coordinates and flags
             if not item.flags.on_ground then
@@ -64,15 +53,6 @@ function check_block_items(fix)
                         should_fix = true
                     end
                 end
-            end
-        end
-
-        -- Sort the vector if needed
-        if resort then
-            if fix then
-                utils.sort_vector(block.items)
-            else
-                should_fix = true
             end
         end
 

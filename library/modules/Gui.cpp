@@ -274,6 +274,7 @@ DEFINE_GET_FOCUS_STRING_HANDLER(dwarfmode)
             focus += "/None";
         break;
 
+    case ZonesPitInfo:
     case ZonesPenInfo:
         if (ui_building_assign_type && ui_building_assign_units &&
             ui_building_assign_is_marked && ui_building_assign_items &&
