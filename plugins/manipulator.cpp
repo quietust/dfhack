@@ -376,12 +376,16 @@ bool sortBySkill (const UnitInfo *d1, const UnitInfo *d2)
         df::unit_skill *s2 = binsearch_in_vector<df::unit_skill,df::job_skill>(d2->unit->status.current_soul->skills, &df::unit_skill::id, sort_skill);
         int l1 = s1 ? s1->rating : 0;
         int l2 = s2 ? s2->rating : 0;
+        int r1 = s1 ? s1->rusty : 0;
+        int r2 = s2 ? s2->rusty : 0;
         int e1 = s1 ? s1->experience : 0;
         int e2 = s2 ? s2->experience : 0;
         if (descending)
         {
             if (l1 != l2)
                 return l1 > l2;
+            if (r1 != r2)
+                return r1 < r2;
             if (e1 != e2)
                 return e1 > e2;
         }
@@ -389,6 +393,8 @@ bool sortBySkill (const UnitInfo *d1, const UnitInfo *d2)
         {
             if (l1 != l2)
                 return l1 < l2;
+            if (r1 != r2)
+                return r1 > r2;
             if (e1 != e2)
                 return e1 < e2;
         }
@@ -1936,11 +1942,13 @@ void viewscreen_unitlaborsst::render()
         for (int col = 0; col < col_widths[DISP_COLUMN_LABORS]; col++)
         {
             int col_offset = col + first_column;
-            fg = 15;
             bg = 0;
             uint8_t c = 0xFA;
-            if ((col_offset == sel_column) && (row_offset == sel_row))
-                fg = 9;
+            bool sel = ((col_offset == sel_column) && (row_offset == sel_row));
+            if (sel)
+                fg = 9; // bright blue
+            else
+                fg = 15; // white
             if (columns[col_offset].skill != job_skill::NONE)
             {
                 df::unit_skill *skill = NULL;
@@ -1949,6 +1957,14 @@ void viewscreen_unitlaborsst::render()
                 if ((skill != NULL) && (skill->rating || skill->experience))
                 {
                     int level = skill->rating;
+                    if (skill->rusty > 0)
+                    {
+                        //level = std::max(level - skill->rusty, 0);
+                        if (sel)
+                            fg = (skill->rusty == 6) ? 13 : 14; // bright magenta for full rust, yellow for partial
+                        else
+                            fg = (skill->rusty == 6) ? 12 : 6; // bright red for full rust, brown for partial
+                    }
                     if (level > NUM_SKILL_LEVELS - 1)
                         level = NUM_SKILL_LEVELS - 1;
                     c = skill_levels[level].abbrev;
@@ -2016,6 +2032,8 @@ void viewscreen_unitlaborsst::render()
                 str = stl_sprintf("%s %s", skill_levels[level].name, ENUM_ATTR_STR(job_skill, caption_noun, columns[sel_column].skill));
                 if (level != NUM_SKILL_LEVELS - 1)
                     str += stl_sprintf(" (%d/%d)", skill->experience, skill_levels[level].points);
+                if (skill->rusty)
+                    str += stl_sprintf(", Rusty (-%d)", skill->rusty);
             }
             else
                 str = stl_sprintf("Not %s (0/500)", ENUM_ATTR_STR(job_skill, caption_noun, columns[sel_column].skill));
