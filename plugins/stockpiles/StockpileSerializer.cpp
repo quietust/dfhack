@@ -817,15 +817,15 @@ void StockpileSerializer::write_furniture()
     furniture->set_sand_bags ( mPile->settings.furniture.sand_bags );
 
     // FURNITURE type
-    using df::enums::furniture_type::furniture_type;
-    df::enum_traits<furniture_type> type_traits;
+    using df::enums::item_type::item_type;
+    df::enum_traits<item_type> type_traits;
     for ( size_t i = 0; i < mPile->settings.furniture.type.size(); ++i )
     {
         if ( mPile->settings.furniture.type.at ( i ) )
         {
             std::string f_type ( type_traits.key_table[i] );
             furniture->add_type ( f_type );
-            debug() << "furniture_type " << i << " is " << f_type <<endl;
+            debug() << "item_type " << i << " is " << f_type <<endl;
         }
     }
     // metal, stone/clay materials
@@ -872,8 +872,8 @@ void StockpileSerializer::read_furniture()
             mPile->settings.furniture.sand_bags = false;
 
         // type
-        using df::enums::furniture_type::furniture_type;
-        df::enum_traits<furniture_type> type_traits;
+        using df::enums::item_type::item_type;
+        df::enum_traits<item_type> type_traits;
         mPile->settings.furniture.type.clear();
         mPile->settings.furniture.type.resize ( type_traits.last_item_value+1,  '\0' );
         if ( furniture.type_size() > 0 )
@@ -881,7 +881,7 @@ void StockpileSerializer::read_furniture()
             for ( int i = 0; i < furniture.type_size(); ++i )
             {
                 const std::string type = furniture.type ( i );
-                df::enum_traits<furniture_type>::base_type idx = linear_index ( debug(), type_traits, type );
+                df::enum_traits<item_type>::base_type idx = linear_index ( debug(), type_traits, type );
                 debug() << "   type " << idx << " is " << type << endl;
                 if ( idx < 0 ||  idx >=  mPile->settings.furniture.type.size() )
                 {

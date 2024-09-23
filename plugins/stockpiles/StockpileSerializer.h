@@ -11,7 +11,6 @@
 #include "df/world.h"
 #include "df/world_data.h"
 #include "df/organic_mat_category.h"
-#include "df/furniture_type.h"
 #include "df/item_quality.h"
 #include "df/item_type.h"
 

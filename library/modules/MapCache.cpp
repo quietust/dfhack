@@ -59,7 +59,6 @@ using namespace std;
 #include "df/world_region_details.h"
 #include "df/builtin_mats.h"
 #include "df/block_square_event_grassst.h"
-#include "df/z_level_flags.h"
 #include "df/region_map_entry.h"
 #include "df/flow_info.h"
 #include "df/plant.h"
