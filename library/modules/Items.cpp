@@ -875,8 +875,6 @@ bool DFHack::Items::moveToContainer(MapExtras::MapCache &mc, df::item *item, df:
 
     item->pos = container->pos;
     item->flags.bits.in_inventory = true;
-
-    container->flags.bits.container = true;
     container->flags.bits.weight_computed = false;
 
     ref1->item_id = item->id;
