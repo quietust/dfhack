@@ -33,7 +33,7 @@ function list_features()
     local name = df.new('string')
     for idx, feat in ipairs(map_features) do
         local tags = ''
-        for _, t in pairs({'water', 'magma', 'subterranean', 'chasm', 'layer'}) do
+        for _, t in pairs({'water', 'magma', 'subterranean', 'chasm', 'underworld'}) do
             if feat['is' .. t:sub(1, 1):upper() .. t:sub(2)](feat) then
                 tags = tags .. (' [%s]'):format(t)
             end
