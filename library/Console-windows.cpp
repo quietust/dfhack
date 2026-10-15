@@ -75,6 +75,7 @@ namespace DFHack
             rawmode = 0;
             console_in = 0;
             console_out = 0;
+            exit_event = 0;
             ConsoleWindow = 0;
             default_attributes = 0;
             state = con_unclaimed;
@@ -273,13 +274,21 @@ namespace DFHack
             inf.dwCursorPosition.X = (SHORT)plen;
             SetConsoleCursorPosition(console_out, inf.dwCursorPosition);
 
+            // exit_event comes first so shutdown wins if input is also
+            // pending. The console input handle is signaled whenever its
+            // input queue is non-empty, so the read below cannot block.
+            const HANDLE wait_handles[] = { exit_event, console_in };
             while (1)
             {
                 INPUT_RECORD rec;
                 DWORD count;
                 lock->unlock();
-                ReadConsoleInputA(console_in, &rec, 1, &count);
+                DWORD wait_result = WaitForMultipleObjects(2, wait_handles, FALSE, INFINITE);
                 lock->lock();
+                if (wait_result != WAIT_OBJECT_0 + 1
+                    || ReadConsoleInputA(console_in, &rec, 1, &count) == 0) {
+                    return -2;
+                }
                 if (rec.EventType != KEY_EVENT || !rec.Event.KeyEvent.bKeyDown)
                     continue;
                 switch (rec.Event.KeyEvent.wVirtualKeyCode)
@@ -383,6 +392,7 @@ namespace DFHack
         int rawmode;
         HANDLE console_in;
         HANDLE console_out;
+        HANDLE exit_event;
         HWND ConsoleWindow;
         HWND MainWindow;
         WORD default_attributes;
@@ -466,6 +476,9 @@ bool Console::init(bool)
     d->console_owned = AllocConsole() != FALSE;
     d->ConsoleWindow = GetConsoleWindow();
     wlock = new recursive_mutex();
+    d->exit_event = CreateEventW(NULL, TRUE, FALSE, NULL);
+    if (!d->exit_event)
+        return false;
     if (d->console_owned)
     {
         HMENU  hm = GetSystemMenu(d->ConsoleWindow,false);
@@ -523,6 +536,10 @@ bool Console::shutdown(void)
 {
     assert(inited);
     lock_guard <recursive_mutex> g(*wlock);
+    // Wake any thread waiting on console input so it leaves prompt_loop
+    // before we detach or reconfigure the console below.
+    if (d->exit_event)
+        SetEvent(d->exit_event);
     if (d->console_owned)
     {
         FreeConsole();
